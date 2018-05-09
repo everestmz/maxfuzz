@@ -1,34 +1,51 @@
 // Manages crash file syncing & uploading for go fuzzers
 
 package main
+
 import (
-  "time"
+	"time"
 
-  "maxfuzz/fuzzer-base/internal/helpers"
+	"maxfuzz/fuzzer-base/internal/helpers"
+	"maxfuzz/fuzzer-base/internal/supervisor"
 
-  "github.com/howeyc/fsnotify"
+	"github.com/howeyc/fsnotify"
 )
 
+var log = helpers.BasicLogger()
+
 func main() {
-  // Setup file watchers & uploaders
-  crashWatcher, err := fsnotify.NewWatcher()
-  helpers.Check("Unable to create crash watcher: %v", err)
+	// Setup file watchers & uploaders
+	crashWatcher, err := fsnotify.NewWatcher()
+	helpers.Check("Unable to create crash watcher: %v", err)
+	helpers.QuickLog(log, "Created gofuzz crash watcher")
 
-  go helpers.WatchFile(crashWatcher);
+	go helpers.WatchFile(crashWatcher)
+	helpers.QuickLog(log, "Started crash watcher goroutine")
 
-  // Wait for fuzzers to initialize
-  for (!helpers.Exists("/root/fuzz_out/crashers")) {
-    time.Sleep(time.Second * 10)
-  }
+	fuzzerSupervisor := supervisor.New("gofuzz-supervisor")
+	goFuzzService := &GoService{}
+	fuzzerSupervisor.Add(goFuzzService)
+	fuzzerSupervisor.ServeBackground()
 
-  // Add crash and hang directories to file watchers
-  err = crashWatcher.Watch("/root/fuzz_out/crashers")
-  helpers.Check("Error watching folder: %v", err)
+	// Wait for fuzzers to initialize
+	helpers.QuickLog(log, "Waiting for fuzzers to initialize")
+	for !helpers.Exists("/root/fuzz_out/crashers") {
+		time.Sleep(time.Second * 10)
+	}
+	helpers.QuickLog(log, "Fuzzer initialized")
 
-  // Ensure we backup the fuzz_out dir regularly
-  go helpers.RegularBackup("/root/fuzz_out")
+	// Add crash and hang directories to file watchers
+	err = crashWatcher.Watch("/root/fuzz_out/crashers")
+	helpers.Check("Error watching folder: %v", err)
+	helpers.QuickLog(log, "Watching gofuzz crash directory")
 
-  // For now, let go-fuzz log itself. It's not JSON, but it'll do.
-  // TODO: Write JSON logging for go-fuzz
-  select {}
+	// Ensure we backup the fuzz_out dir regularly
+	go helpers.RegularBackup("/root/fuzz_out")
+	helpers.QuickLog(log, "Started fuzzer state backups goroutine")
+
+	helpers.QuickLog(log, "Fuzzers healthy!")
+
+	//TODO: add fuzzer health checks
+
+	select {}
 }

@@ -1,105 +1,71 @@
 // Manages crash file uploading & syncing, and logging, for all AFL fuzzers
 
 package main
+
 import (
-  "fmt"
-  "os"
-  "time"
-  "io/ioutil"
-  "bufio"
-  "strconv"
-  "strings"
+	"time"
 
-  "maxfuzz/fuzzer-base/internal/helpers"
+	"maxfuzz/fuzzer-base/internal/helpers"
+	"maxfuzz/fuzzer-base/internal/supervisor"
 
-  "github.com/howeyc/fsnotify"
-  log "github.com/sirupsen/logrus"
+	"github.com/howeyc/fsnotify"
 )
 
+var log = helpers.BasicLogger()
+
 func main() {
+	// Setup file watchers & uploaders
+	masterWatcher, err := fsnotify.NewWatcher()
+	helpers.Check("Unable to create master watcher: %v", err)
+	helpers.QuickLog(log, "Created master crash watcher")
+	slaveWatcher, err := fsnotify.NewWatcher()
+	helpers.Check("Unable to create slave watcher: %v", err)
+	helpers.QuickLog(log, "Created slave crash watcher")
 
-  // Setup file watchers & uploaders
-  slaveWatcher, err := fsnotify.NewWatcher()
-  helpers.Check("Unable to create slave watcher: %v", err)
-  masterWatcher, err := fsnotify.NewWatcher()
-  helpers.Check("Unable to create master watcher: %v", err)
+	go helpers.WatchFile(masterWatcher)
+	go helpers.WatchFile(slaveWatcher)
+	helpers.QuickLog(log, "Started crash watcher goroutines")
 
-  go helpers.WatchFile(masterWatcher);
-  go helpers.WatchFile(slaveWatcher);
+	// Start up supervisor and begin running fuzzers
+	fuzzerSupervisor := supervisor.New("fuzzer-ctl")
+	masterService := &AFLService{"master"}
+	slaveService := &AFLService{"slave"}
+	fuzzerSupervisor.Add(masterService)
+	fuzzerSupervisor.Add(slaveService)
+	fuzzerSupervisor.ServeBackground()
 
-  // Wait for fuzzers to initialize
-  for (
-    !helpers.Exists("/root/fuzz_out/master/crashes") ||
-    !helpers.Exists("/root/fuzz_out/slave/crashes")) {
-    time.Sleep(time.Second * 10)
-  }
+	// Wait for fuzzers to initialize
+	helpers.QuickLog(log, "Waiting for fuzzers to initialize")
+	for !helpers.Exists("/root/fuzz_out/master/crashes") ||
+		!helpers.Exists("/root/fuzz_out/slave/crashes") {
+		time.Sleep(time.Second * 1)
+	}
+	helpers.QuickLog(log, "Fuzzers initialized")
 
-  // Add crash and hang directories to file watchers
-  err = masterWatcher.Watch("/root/fuzz_out/master/crashes")
-  helpers.Check("Error watching folder: %v", err)
-  err = masterWatcher.Watch("/root/fuzz_out/master/hangs")
-  helpers.Check("Error watching folder: %v", err)
+	// Add crash and hang directories to file watchers
+	err = masterWatcher.Watch("/root/fuzz_out/master/crashes")
+	helpers.Check("Error watching folder: %v", err)
+	err = masterWatcher.Watch("/root/fuzz_out/master/hangs")
+	helpers.Check("Error watching folder: %v", err)
+	helpers.QuickLog(log, "Watching master crash directories")
 
-  err = slaveWatcher.Watch("/root/fuzz_out/slave/crashes")
-  helpers.Check("Error watching folder: %v", err)
-  err = slaveWatcher.Watch("/root/fuzz_out/slave/hangs")
-  helpers.Check("Error watching folder: %v", err)
+	err = slaveWatcher.Watch("/root/fuzz_out/slave/crashes")
+	helpers.Check("Error watching folder: %v", err)
+	err = slaveWatcher.Watch("/root/fuzz_out/slave/hangs")
+	helpers.Check("Error watching folder: %v", err)
+	helpers.QuickLog(log, "Watching slave crash directories")
 
-  // Ensure we backup the fuzz_out dir regularly
-  go helpers.RegularBackup("/root/fuzz_out")
+	// Ensure we backup the fuzz_out dir regularly
+	go helpers.RegularBackup("/root/fuzz_out")
+	helpers.QuickLog(log, "Started fuzzer state backups goroutine")
 
-  // Ensure the fuzzers are outputting stats before we start logging
-  for (
-    !helpers.Exists("/root/fuzz_out/master/fuzzer_stats") ||
-    !helpers.Exists("/root/fuzz_out/slave/fuzzer_stats")) {
-    time.Sleep(time.Second * 5)
-  }
+	// Ensure the fuzzers are outputting stats
+	helpers.QuickLog(log, "Waiting for fuzzer health check to complete")
+	for !helpers.Exists("/root/fuzz_out/master/fuzzer_stats") ||
+		!helpers.Exists("/root/fuzz_out/slave/fuzzer_stats") {
+		time.Sleep(time.Second * 1)
+	}
+	helpers.QuickLog(log, "Fuzzers healthy!")
 
-  // Setup afl stats logging
-  log.SetFormatter(&log.JSONFormatter{})
-  for {
-    liveFuzzers, err := ioutil.ReadDir("/root/fuzz_out")
-    helpers.Check("Failed to read /root/fuzz_out %v", err)
-
-    for _, fuzzerInstance := range liveFuzzers {
-      summary_map := make(map[string]string)
-      file, err := os.Open(
-        fmt.Sprintf("/root/fuzz_out/%v/fuzzer_stats", fuzzerInstance.Name()),
-      )
-      helpers.Check("Opening fuzzer stats failed %v", err)
-      defer file.Close()
-
-      // This adds lines like "key : val" to summary_map[key] = val
-      scanner := bufio.NewScanner(file)
-      for scanner.Scan() {
-        spl := strings.Split(scanner.Text(), ":")
-        k := strings.TrimSpace(spl[0])
-        v := strings.TrimSpace(spl[1])
-        summary_map[k] = v
-      }
-
-      cycles, err := strconv.Atoi(summary_map["cycles_done"])
-      execs, err := strconv.Atoi(summary_map["execs_done"])
-      execsPerSecond, err := strconv.ParseFloat(
-        summary_map["execs_per_sec"],
-        64,
-      )
-      crashes, err := strconv.Atoi(summary_map["unique_crashes"])
-      hangs, err := strconv.Atoi(summary_map["unique_hangs"])
-      pending_faves, err := strconv.Atoi(summary_map["pending_favs"])
-      pending_total, err := strconv.Atoi(summary_map["pending_total"])
-
-      log.WithFields(log.Fields{
-        "fuzzer": summary_map["afl_banner"],
-        "cycles_done": cycles,
-        "execs_done": execs,
-        "execs_per_second": execsPerSecond,
-        "crashes": crashes,
-        "hangs": hangs,
-        "pending_faves": pending_faves,
-        "pending_total": pending_total,
-      }).Info()
-    }
-    time.Sleep(30*time.Second)
-  }
+	select {}
 }
