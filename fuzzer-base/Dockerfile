@@ -25,47 +25,43 @@ RUN apt-get update
 RUN apt-get install -y software-properties-common
 RUN apt-add-repository -y ppa:rael-gc/rvm
 RUN apt-add-repository -y ppa:gophers/archive
-RUN apt-get update
-RUN apt-get install -y \
-  git\
-  wget\
-  gcc\
-  autoconf\
-  make\
-  bison\
-  libssl-dev\
-  libreadline-dev\
-  zlib1g-dev\
-  pkg-config\
-  gcc\
-  clang\
-  llvm\
-  rvm\
-  watch\
-  nodejs\
-  npm\
-  supervisor\
-  cmake\
-  gdb\
-  python-virtualenv\
-  golang-1.9-go\
-  cython\
-  build-essential\
-  libgtk2.0-dev\
-  libtbb-dev\
-  python-dev\
-  python-numpy\
-  python-scipy\
-  libjasper-dev\
-  libjpeg-dev\
-  libpng-dev\
-  libtiff-dev\
-  libavcodec-dev\
-  libavutil-dev\
-  libavformat-dev\
-  libswscale-dev\
-  libdc1394-22-dev\
-  libv4l-dev
+RUN apt-get update --fix-missing
+RUN apt-get install -y git
+RUN apt-get install -y wget
+RUN apt-get install -y gcc
+RUN apt-get install -y autoconf
+RUN apt-get install -y make
+RUN apt-get install -y bison
+RUN apt-get install -y libssl-dev
+RUN apt-get install -y libreadline-dev
+RUN apt-get install -y zlib1g-dev
+RUN apt-get install -y pkg-config
+RUN apt-get install -y gcc
+RUN apt-get install -y clang
+RUN apt-get install -y llvm
+RUN apt-get install -y rvm
+RUN apt-get install -y watch
+RUN apt-get install -y cmake
+RUN apt-get install -y gdb
+RUN apt-get install -y python-virtualenv
+RUN apt-get install -y golang-1.9-go
+RUN apt-get install -y cython
+RUN apt-get install -y build-essential
+RUN apt-get install -y libgtk2.0-dev
+RUN apt-get install -y libtbb-dev
+RUN apt-get install -y python-dev
+RUN apt-get install -y python-numpy
+RUN apt-get install -y python-scipy
+RUN apt-get install -y libjasper-dev
+RUN apt-get install -y libjpeg-dev
+RUN apt-get install -y libpng-dev
+RUN apt-get install -y libtiff-dev
+RUN apt-get install -y libavcodec-dev
+RUN apt-get install -y libavutil-dev
+RUN apt-get install -y libavformat-dev
+RUN apt-get install -y libswscale-dev
+RUN apt-get install -y libdc1394-22-dev
+RUN apt-get install -y libv4l-dev
 
 ###########################
 # AFL Compilation & Setup #
@@ -127,12 +123,6 @@ COPY ./Gopkg.toml /root/go/src/maxfuzz/fuzzer-base/Gopkg.toml
 COPY ./Makefile /root/go/src/maxfuzz/fuzzer-base/Makefile
 RUN make && make install
 WORKDIR /root
-
-# Setup sidecar webapp
-COPY ./sidecar ./sidecar
-RUN curl -sL https://deb.nodesource.com/setup_8.x | sudo -E bash -
-RUN apt-get install -y nodejs
-RUN cd sidecar && npm install log
 
 #################################
 # FINAL SETUP & COPYING SCRIPTS #

@@ -9,11 +9,11 @@ else
 fi
 $BUILD_FILES/build_steps
 if [ "$1" = "reproduce" ]; then
-  ASAN_OPTIONS="symbolize=1:detect_leaks=0:abort_on_error=1" MAXFUZZ_ENV=reproducer /usr/bin/supervisord -c /root/config/supervisord/reproduce_supervisord.conf
+  MAXFUZZ_ENV=reproducer ASAN_OPTIONS="symbolize=1:detect_leaks=0:abort_on_error=1" $GOBIN/reproduce
 elif [ "$1" = "gofuzz" ]; then
   $GOBIN/pre-sync
-  MAXFUZZ_ENV=fuzzer /usr/bin/supervisord -c /root/config/supervisord/go_fuzz_supervisord.conf
+  MAXFUZZ_ENV=fuzzer $GOBIN/go-monitor
 else
   $GOBIN/pre-sync
-  MAXFUZZ_ENV=fuzzer AFL_IO_OPTIONS=$(cat /root/config/afl-io-options) /usr/bin/supervisord -c /root/config/supervisord/fuzz_supervisord.conf
+  MAXFUZZ_ENV=fuzzer AFL_IO_OPTIONS=$(cat /root/config/afl-io-options) $GOBIN/monitor
 fi

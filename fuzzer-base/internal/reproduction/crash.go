@@ -4,6 +4,6 @@ package reproduction
 // reproduce.
 
 type Crash struct {
-  Filename string
-  Kind string
+	Filename string
+	Kind     string
 }

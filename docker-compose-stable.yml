@@ -4,13 +4,15 @@ services:
     image: redis:3.2.4
     ports:
       - "6379"
-  sidecar:
+  stats:
     build:
       context: .
-      dockerfile: Dockerfile_stable
+      dockerfile: Dockerfile_dev
     ports:
-      - "3000:8888"
-    command: /usr/bin/supervisord -c /root/config/supervisord/sidecar_supervisord.conf
+      - "8080:8080"
+    command: /root/go/bin/stats
+    environment:
+      - NO_REPRODUCTION=1
   asan-vulnerable:
     build:
       context: .
