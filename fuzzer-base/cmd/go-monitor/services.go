@@ -30,7 +30,7 @@ func (s GoService) Serve() {
     goFuzzZip, goFuzzWorkdir)
 
   command := cmd.NewCmdOptions(cmdOptions, goFuzzBinary, goFuzzZip,
-    goFuzzWorkdir)
+    goFuzzWorkdir, "-http=0.0.0.0:8000")
 
   helpers.QuickLog(log, fmt.Sprintf("Running gofuzz command: %s",
     goFuzzRunCommand))

@@ -4,15 +4,15 @@ services:
     image: redis:3.2.4
     ports:
       - "6379"
-  stats:
-    build:
-      context: .
-      dockerfile: Dockerfile_dev
-    ports:
-      - "8080:8080"
-    command: /root/go/bin/stats
-    environment:
-      - NO_REPRODUCTION=1
+  # stats:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile_dev
+  #   ports:
+  #     - "8080:8080"
+  #   command: /root/go/bin/stats
+  #   environment:
+  #     - NO_REPRODUCTION=1
   go-eth:
     build:
       context: .
@@ -25,27 +25,31 @@ services:
       - NO_REPRODUCTION=1
     links:
       - redis
-  asan-vulnerable:
-    build:
-      context: .
-      dockerfile: Dockerfile_dev
-    command: /root/fuzzer-files/vulnerable/start
-    volumes:
-      - ${SYNC_DIR}:/root/sync
-    environment:
-      - MAXFUZZ_ENABLE_S3=0
-      - REDIS_QUEUE_URL=redis:6379
-    links:
-      - redis
-  asan-vulnerable-repro:
-    build:
-      context: .
-      dockerfile: Dockerfile_dev
-    command: /root/fuzzer-files/vulnerable/start reproduce
-    volumes:
-      - ${SYNC_DIR}:/root/sync
-    environment:
-      - MAXFUZZ_ENABLE_S3=0
-      - REDIS_QUEUE_URL=redis:6379
-    links:
-      - redis
+    ports:
+      - "8000:8000"
+  # asan-vulnerable:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile_dev
+  #   command: /root/fuzzer-files/vulnerable/start
+  #   volumes:
+  #     - ${SYNC_DIR}:/root/sync
+  #   environment:
+  #     - MAXFUZZ_ENABLE_S3=0
+  #     - REDIS_QUEUE_URL=redis:6379
+  #   links:
+  #     - redis
+  #   ports:
+  #     - "8080:8080"
+  # asan-vulnerable-repro:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile_dev
+  #   command: /root/fuzzer-files/vulnerable/start reproduce
+  #   volumes:
+  #     - ${SYNC_DIR}:/root/sync
+  #   environment:
+  #     - MAXFUZZ_ENABLE_S3=0
+  #     - REDIS_QUEUE_URL=redis:6379
+  #   links:
+  #     - redis
