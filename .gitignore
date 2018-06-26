@@ -7,3 +7,8 @@ fuzzer-base/sync
 fuzzer-base/bin
 fuzzer-base/fuzz_out
 */vendor
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json

@@ -3,14 +3,14 @@
 package main
 
 import (
-	"time"
 	"net/http"
+	"time"
 
 	"maxfuzz/fuzzer-base/internal/helpers"
 	"maxfuzz/fuzzer-base/internal/supervisor"
 
-	"github.com/howeyc/fsnotify"
 	"github.com/graphql-go/handler"
+	"github.com/howeyc/fsnotify"
 )
 
 var log = helpers.BasicLogger()
@@ -71,8 +71,8 @@ func main() {
 
 	helpers.QuickLog(log, "Starting fuzzer stats server")
 	gqlHandler := handler.New(&handler.Config{
-		Schema: &schema,
-		Pretty: true,
+		Schema:   &schema,
+		Pretty:   true,
 		GraphiQL: true,
 	})
 	http.Handle("/", gqlHandler)

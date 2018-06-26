@@ -1,41 +1,41 @@
 package main
 
 import (
-  "fmt"
-  "os"
+	"fmt"
+	"os"
 
-  "maxfuzz/fuzzer-base/internal/helpers"
+	"maxfuzz/fuzzer-base/internal/helpers"
 
-  "github.com/go-cmd/cmd"
+	"github.com/go-cmd/cmd"
 )
 
 var cmdOptions = cmd.Options{
-  Buffered: false,
-  Streaming: true,
+	Buffered:  false,
+	Streaming: true,
 }
 
-type GoService struct {}
+type GoService struct{}
 
 func (s GoService) Stop() {
-  helpers.QuickLog(log, "Stopping gofuzz instance")
+	helpers.QuickLog(log, "Stopping gofuzz instance")
 }
 
 func (s GoService) Serve() {
-  helpers.QuickLog(log, "Starting gofuzz instance")
-  goFuzzBinary := "/root/go/bin/go-fuzz"
-  goFuzzZip := fmt.Sprintf("-bin=%s", helpers.GetenvOrDie("GO_FUZZ_ZIP"))
-  goFuzzWorkdir := "-workdir=/root/fuzz_out"
+	helpers.QuickLog(log, "Starting gofuzz instance")
+	goFuzzBinary := "/root/go/bin/go-fuzz"
+	goFuzzZip := fmt.Sprintf("-bin=%s", helpers.GetenvOrDie("GO_FUZZ_ZIP"))
+	goFuzzWorkdir := "-workdir=/root/fuzz_out"
 
-  goFuzzRunCommand := fmt.Sprintf("%s %s %s", goFuzzBinary,
-    goFuzzZip, goFuzzWorkdir)
+	goFuzzRunCommand := fmt.Sprintf("%s %s %s", goFuzzBinary,
+		goFuzzZip, goFuzzWorkdir)
 
-  command := cmd.NewCmdOptions(cmdOptions, goFuzzBinary, goFuzzZip,
-    goFuzzWorkdir, "-http=0.0.0.0:8000")
+	command := cmd.NewCmdOptions(cmdOptions, goFuzzBinary, goFuzzZip,
+		goFuzzWorkdir, "-http=0.0.0.0:8000")
 
-  helpers.QuickLog(log, fmt.Sprintf("Running gofuzz command: %s",
-    goFuzzRunCommand))
+	helpers.QuickLog(log, fmt.Sprintf("Running gofuzz command: %s",
+		goFuzzRunCommand))
 
-  // Kick off logger
+	// Kick off logger
 	go func() {
 		for {
 			select {
@@ -47,13 +47,13 @@ func (s GoService) Serve() {
 		}
 	}()
 
-  helpers.QuickLog(log, "Started log interception")
-  command.Start()
-  helpers.QuickLog(log, "Started fuzzer")
-  status := command.Status()
-  for status.StopTs == 0 {
+	helpers.QuickLog(log, "Started log interception")
+	command.Start()
+	helpers.QuickLog(log, "Started fuzzer")
+	status := command.Status()
+	for status.StopTs == 0 {
 		status = command.Status()
 	}
-  helpers.QuickLog(log, fmt.Sprintf("gofuzz died with exit code: %v \n %s",
-    status.Exit, status.Error))
+	helpers.QuickLog(log, fmt.Sprintf("gofuzz died with exit code: %v \n %s",
+		status.Exit, status.Error))
 }

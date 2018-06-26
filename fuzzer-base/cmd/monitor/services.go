@@ -36,7 +36,7 @@ func (s AFLService) Serve() {
 	aflRunCommand := ""
 	var command *cmd.Cmd
 
-	if (len(aflIoOptionsSplit) == 4) {
+	if len(aflIoOptionsSplit) == 4 {
 		// Starting new fuzzer, we need a sync dir and an in dir
 		helpers.QuickLog(log, "Starting new fuzzer from scratch")
 		inDir := aflIoOptionsSplit[1]
@@ -52,7 +52,7 @@ func (s AFLService) Serve() {
 		command = cmd.NewCmdOptions(cmdOptions,
 			aflBinary, "-i", inDir, "-o", syncDir, "-m", aflMemoryLimit,
 			fmt.Sprintf("-%s", aflInstanceFlag), s.Instance, "--", aflBinaryLocation)
-	} else if (len(aflIoOptionsSplit) == 3) {
+	} else if len(aflIoOptionsSplit) == 3 {
 		// Restarting from backup, only need sync dir
 		helpers.QuickLog(log, "Restarting fuzzer from backup")
 		syncDir := aflIoOptionsSplit[2]

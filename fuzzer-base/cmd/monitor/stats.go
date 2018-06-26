@@ -1,10 +1,10 @@
 package main
 
 import (
-	"os"
-	"fmt"
 	"bufio"
+	"fmt"
 	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,21 +15,21 @@ import (
 )
 
 type AFLStats struct {
-	StartTime string `json:"startTime"`
-	LastUpdate string `json:"lastUpdate"`
-	CyclesDone int `json:"cyclesDone"`
-	ExecsDone int `json:"execsDone"`
-	ExecsPerSecond float32 `json:"execsPerSecond"`
-	TotalPaths int `json:"totalPaths"`
-	FavoredPaths int `json:"favoredPaths"`
-	PathsFound int `json:"pathsFound"`
-	PathsImported int `json:"pathsImported"`
-	UniqueCrashes int `json:"uniqueCrashes"`
-	UniqueHangs int `json:"uniqueHangs"`
-	ExecsSinceCrash int `json:"execsSinceCrash"`
-	ExecTimeout int `json:"execTimeout"`
-	Stability float32 `json:"stability"`
-	AFLBanner string `json:"aflBanner"`
+	StartTime       string  `json:"startTime"`
+	LastUpdate      string  `json:"lastUpdate"`
+	CyclesDone      int     `json:"cyclesDone"`
+	ExecsDone       int     `json:"execsDone"`
+	ExecsPerSecond  float32 `json:"execsPerSecond"`
+	TotalPaths      int     `json:"totalPaths"`
+	FavoredPaths    int     `json:"favoredPaths"`
+	PathsFound      int     `json:"pathsFound"`
+	PathsImported   int     `json:"pathsImported"`
+	UniqueCrashes   int     `json:"uniqueCrashes"`
+	UniqueHangs     int     `json:"uniqueHangs"`
+	ExecsSinceCrash int     `json:"execsSinceCrash"`
+	ExecTimeout     int     `json:"execTimeout"`
+	Stability       float32 `json:"stability"`
+	AFLBanner       string  `json:"aflBanner"`
 }
 
 var gqlStatsType = graphql.NewObject(graphql.ObjectConfig{
@@ -87,9 +87,9 @@ var rootQuery = graphql.NewObject(graphql.ObjectConfig{
 	Name: "RootQuery",
 	Fields: graphql.Fields{
 		"stats": &graphql.Field{
-			Type: graphql.NewList(gqlStatsType),
+			Type:        graphql.NewList(gqlStatsType),
 			Description: "Get fuzzer stats",
-			Resolve: resolveStats,
+			Resolve:     resolveStats,
 		},
 	},
 })
@@ -113,7 +113,7 @@ func resolveStats(params graphql.ResolveParams) (interface{}, error) {
 func updateStats() {
 	liveFuzzers, err := ioutil.ReadDir("/root/fuzz_out")
 	helpers.Check("Failed to read /root/fuzz_out %v", err)
-	
+
 	newSlaveStats := AFLStats{}
 	newMasterStats := AFLStats{}
 
@@ -157,7 +157,7 @@ func updateStats() {
 
 		stats.FavoredPaths, err = strconv.Atoi(summary_map["paths_favored"])
 		helpers.Check("Failed to parse favored paths: %v", err)
-		
+
 		stats.PathsFound, err = strconv.Atoi(summary_map["paths_found"])
 		helpers.Check("Failed to parse paths found: %v", err)
 
