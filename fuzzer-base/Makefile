@@ -17,10 +17,9 @@ build:
 	go build -o ./bin/go-monitor ./cmd/go-monitor
 	go build -o ./bin/pre-sync ./cmd/pre-sync
 	go build -o ./bin/reproduce ./cmd/reproduce
-	go build -o ./bin/stats ./cmd/stats
 
 install:
-	mv -t ${GOBIN} ./bin/monitor ./bin/pre-sync ./bin/reproduce ./bin/go-monitor ./bin/stats
+	mv -t ${GOBIN} ./bin/monitor ./bin/pre-sync ./bin/reproduce ./bin/go-monitor
 
 teardown:
 	docker-compose down

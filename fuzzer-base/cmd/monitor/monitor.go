@@ -14,6 +14,7 @@ import (
 )
 
 var log = helpers.BasicLogger()
+var startupSteps = 6
 
 func main() {
 	// Setup file watchers & uploaders
@@ -23,10 +24,12 @@ func main() {
 	slaveWatcher, err := fsnotify.NewWatcher()
 	helpers.Check("Unable to create slave watcher: %v", err)
 	helpers.QuickLog(log, "Created slave crash watcher")
+	helpers.LogStartupStep(log, 0, startupSteps, "set up file watchers")
 
 	go helpers.WatchFile(masterWatcher)
 	go helpers.WatchFile(slaveWatcher)
 	helpers.QuickLog(log, "Started crash watcher goroutines")
+	helpers.LogStartupStep(log, 1, startupSteps, "started crash watcher routines")
 
 	// Start up supervisor and begin running fuzzers
 	fuzzerSupervisor := supervisor.New("fuzzer-ctl")
@@ -35,6 +38,7 @@ func main() {
 	fuzzerSupervisor.Add(masterService)
 	fuzzerSupervisor.Add(slaveService)
 	fuzzerSupervisor.ServeBackground()
+	helpers.LogStartupStep(log, 2, startupSteps, "started fuzzer server")
 
 	// Wait for fuzzers to initialize
 	helpers.QuickLog(log, "Waiting for fuzzers to initialize")
@@ -43,6 +47,7 @@ func main() {
 		time.Sleep(time.Second * 1)
 	}
 	helpers.QuickLog(log, "Fuzzers initialized")
+	helpers.LogStartupStep(log, 3, startupSteps, "fuzzer output confirmed")
 
 	// Add crash and hang directories to file watchers
 	err = masterWatcher.Watch("/root/fuzz_out/master/crashes")
@@ -56,10 +61,12 @@ func main() {
 	err = slaveWatcher.Watch("/root/fuzz_out/slave/hangs")
 	helpers.Check("Error watching folder: %v", err)
 	helpers.QuickLog(log, "Watching slave crash directories")
+	helpers.LogStartupStep(log, 4, startupSteps, "watching crash directories")
 
 	// Ensure we backup the fuzz_out dir regularly
 	go helpers.RegularBackup("/root/fuzz_out")
 	helpers.QuickLog(log, "Started fuzzer state backups goroutine")
+	helpers.LogStartupStep(log, 5, startupSteps, "started fuzzer state backups")
 
 	// Ensure the fuzzers are outputting stats
 	helpers.QuickLog(log, "Waiting for fuzzer health check to complete")
@@ -86,6 +93,7 @@ func main() {
 		}
 	}()
 
+	helpers.LogStartupStep(log, 6, startupSteps, "stats server setup complete")
 	if err = http.ListenAndServe(":8080", nil); err != nil {
 		helpers.QuickLog(log, "Server failed to start")
 	}
