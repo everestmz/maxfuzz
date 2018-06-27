@@ -63,6 +63,16 @@ func QuickLog(logger *logrus.Logger, message string) {
 	).Info()
 }
 
+func LogStartupStep(logger *logrus.Logger, stepNum, totalSteps int, step string) {
+	logger.WithFields(
+		logrus.Fields{
+			"message":                  fmt.Sprintf("Completed startup step %d of %d: %s", stepNum, totalSteps, step),
+			"maxfuzzStartupStep":       stepNum,
+			"maxfuzzTotalStartupSteps": totalSteps,
+		},
+	).Info()
+}
+
 func GenerateTestcaseName(filename string) (string, string) {
 	// Define filenames as fuzzInstance_name_timestamp_gitSha
 	num := int32(time.Now().Unix())
