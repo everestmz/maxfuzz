@@ -133,4 +133,3 @@ COPY ./scripts ./scripts
 COPY ./fuzzer-files/base ./fuzzer-files/base
 RUN chmod -R 755 /root/fuzzer-files
 RUN chmod 755 /root/scripts/reproduce_stdin
-RUN echo "export GIT_SHA=test_environment" >> /root/fuzzer-files/base/environment
