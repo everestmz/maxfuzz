@@ -1,0 +1,32 @@
+version: '3'
+services:
+  redis:
+    image: redis:3.2.4
+    ports:
+      - "6379"
+  fuzzer:
+    image: everestmz/maxfuzz:latest
+    command: /root/fuzzer-files/<%= @fuzzer_name %>/start
+    volumes:
+      - ${SYNC_DIR}:/root/sync
+      - ../:/root/fuzzer-files/<%= @fuzzer_name %>
+    environment:
+      - MAXFUZZ_ENABLE_S3=0
+      - REDIS_QUEUE_URL=redis:6379
+      - GIT_SHA=${GIT_SHA}
+    links:
+      - redis
+    ports:
+      - "8080:8080"
+  reproducer:
+    image: everestmz/maxfuzz:latest
+    command: /root/fuzzer-files/<%= @fuzzer_name %>/start reproduce
+    volumes:
+      - ${SYNC_DIR}:/root/sync
+      - ../:/root/fuzzer-files/<%= @fuzzer_name %>
+    environment:
+      - MAXFUZZ_ENABLE_S3=0
+      - REDIS_QUEUE_URL=redis:6379
+      - GIT_SHA=${GIT_SHA}
+    links:
+      - redis
