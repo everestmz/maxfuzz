@@ -4,7 +4,7 @@
 cp $BUILD_FILES/examples/* /root/fuzz_in/
 cd /root
 
-#### Sanitizet Setup: uncomment these lines to download clang tools
+#### Sanitizer Setup: uncomment these lines to download clang tools
 #### Gives access too LLVM Symbolizer, needed for fuzzing with sanitizers
 # mkdir /root/TMP_CLANG
 # cd /root/TMP_CLANG
