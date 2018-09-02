@@ -7,6 +7,7 @@ import (
 
 // Constants
 var shellPrefix = "#!/bin/bash\n"
+var supportedBases = map[string]bool{"ubuntu:xenial": true}
 
 type Fuzzer interface {
 	Environment() []string // List of envar definitions
@@ -16,15 +17,20 @@ type Fuzzer interface {
 }
 
 // New returns a new Template struct
-func New(fuzzerName, language string, asan bool) Template {
+func New(fuzzerName, language string, asan bool, base string) (Template, error) {
 	if language == "go" {
 		asan = false
+	}
+	_, ok := supportedBases[base]
+	if !ok {
+		return Template{}, fmt.Errorf("base %s not supported", base)
 	}
 	return Template{
 		FuzzerName: fuzzerName,
 		Language:   language,
 		ASAN:       asan,
-	}
+		Base:       base,
+	}, nil
 }
 
 // Template struct used for generating fuzzer files
@@ -32,6 +38,7 @@ type Template struct {
 	FuzzerName string
 	Language   string
 	ASAN       bool
+	Base       string
 }
 
 // GenerateBuildSteps returns full build steps
