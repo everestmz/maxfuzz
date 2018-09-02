@@ -3,11 +3,12 @@ package templates
 import (
 	"bytes"
 	"fmt"
+
+	maxfuzz "github.com/everestmz/maxfuzz/pkg/utils"
 )
 
 // Constants
 var shellPrefix = "#!/bin/bash\n"
-var supportedBases = map[string]bool{"ubuntu:xenial": true}
 
 type Fuzzer interface {
 	Environment() []string // List of envar definitions
@@ -18,11 +19,10 @@ type Fuzzer interface {
 
 // New returns a new Template struct
 func New(fuzzerName, language string, asan bool, base string) (Template, error) {
-	if language == "go" {
+	if language == maxfuzz.Go {
 		asan = false
 	}
-	_, ok := supportedBases[base]
-	if !ok {
+	if !maxfuzz.SupportedBase(base) {
 		return Template{}, fmt.Errorf("base %s not supported", base)
 	}
 	return Template{
@@ -46,7 +46,7 @@ func (t Template) GenerateBuildSteps(customSteps []string) string {
 	var buf bytes.Buffer
 	buf.WriteString(shellPrefix)
 	switch t.Language {
-	case "go":
+	case maxfuzz.Go:
 		// Do nothing
 	default:
 		buf.WriteString(buildStepsPrefix)
@@ -72,9 +72,9 @@ func (t Template) GenerateEnvironment(f Fuzzer) string {
 	}
 
 	switch t.Language {
-	case "go":
+	case maxfuzz.Go:
 		buf.WriteString(fmt.Sprintf(goEnvironmentSettings, f.Run()))
-	case "python":
+	case maxfuzz.Python:
 		buf.WriteString(
 			fmt.Sprintf(
 				pythonEnvironmentSettings,
@@ -106,7 +106,7 @@ func (t Template) GenerateStartFile() string {
 	var buf bytes.Buffer
 	buf.WriteString(shellPrefix)
 	switch t.Language {
-	case "go":
+	case maxfuzz.Go:
 		buf.WriteString(fmt.Sprintf(goStartScript, t.FuzzerName))
 	default:
 		buf.WriteString(fmt.Sprintf(genericStartScript, t.FuzzerName))
