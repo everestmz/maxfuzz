@@ -104,4 +104,6 @@ func (t Template) GenerateStartFile() string {
 	default:
 		buf.WriteString(fmt.Sprintf(genericStartScript, t.FuzzerName))
 	}
+
+	return buf.String()
 }
