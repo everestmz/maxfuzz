@@ -11,6 +11,7 @@ import (
 var shellPrefix = "#!/bin/bash\n"
 
 type Fuzzer interface {
+	BuildSteps() []string
 	Environment() []string // List of envar definitions
 	Run() string           // The binary or fuzzer zip location
 	MemoryLimit() string
@@ -42,7 +43,7 @@ type Template struct {
 }
 
 // GenerateBuildSteps returns full build steps
-func (t Template) GenerateBuildSteps(customSteps []string) string {
+func (t Template) GenerateBuildSteps(f Fuzzer) string {
 	var buf bytes.Buffer
 	buf.WriteString(shellPrefix)
 	switch t.Language {
@@ -53,7 +54,7 @@ func (t Template) GenerateBuildSteps(customSteps []string) string {
 		if t.ASAN {
 			buf.WriteString(asanBuildSteps)
 		}
-		for _, line := range customSteps {
+		for _, line := range f.BuildSteps() {
 			buf.WriteString(fmt.Sprintf("%s\n", line))
 		}
 	}
