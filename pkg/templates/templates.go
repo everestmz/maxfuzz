@@ -96,7 +96,7 @@ func (t Template) GenerateEnvironment(f Fuzzer) bytes.Buffer {
 	}
 
 	for _, line := range f.Environment() {
-		buf.WriteString(fmt.Sprintf("%s\n", line))
+		buf.WriteString(fmt.Sprintf("export %s\n", line))
 	}
 
 	return buf
