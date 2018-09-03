@@ -43,7 +43,7 @@ type Template struct {
 }
 
 // GenerateBuildSteps returns full build steps
-func (t Template) GenerateBuildSteps(f Fuzzer) string {
+func (t Template) GenerateBuildSteps(f Fuzzer) bytes.Buffer {
 	var buf bytes.Buffer
 	buf.WriteString(shellPrefix)
 	switch t.Language {
@@ -59,11 +59,11 @@ func (t Template) GenerateBuildSteps(f Fuzzer) string {
 		}
 	}
 
-	return buf.String()
+	return buf
 }
 
 // GenerateEnvironment returns full environment
-func (t Template) GenerateEnvironment(f Fuzzer) string {
+func (t Template) GenerateEnvironment(f Fuzzer) bytes.Buffer {
 	var buf bytes.Buffer
 	buf.WriteString(shellPrefix)
 	buf.WriteString(environmentPrefix)
@@ -99,11 +99,11 @@ func (t Template) GenerateEnvironment(f Fuzzer) string {
 		buf.WriteString(fmt.Sprintf("%s\n", line))
 	}
 
-	return buf.String()
+	return buf
 }
 
 // GenerateStartFile returns full start file
-func (t Template) GenerateStartFile() string {
+func (t Template) GenerateStartFile() bytes.Buffer {
 	var buf bytes.Buffer
 	buf.WriteString(shellPrefix)
 	switch t.Language {
@@ -113,5 +113,5 @@ func (t Template) GenerateStartFile() string {
 		buf.WriteString(fmt.Sprintf(genericStartScript, t.FuzzerName))
 	}
 
-	return buf.String()
+	return buf
 }
