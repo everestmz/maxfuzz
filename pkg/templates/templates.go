@@ -68,7 +68,9 @@ func (t Template) GenerateBuildSteps(f Fuzzer) bytes.Buffer {
 func (t Template) GenerateEnvironment(f Fuzzer) bytes.Buffer {
 	var buf bytes.Buffer
 	buf.WriteString(shellPrefix)
-	buf.WriteString(environmentPrefix)
+	buf.WriteString(fmt.Sprintf(
+		environmentPrefix, t.FuzzerName, t.FuzzerName),
+	)
 
 	if t.ASAN {
 		buf.WriteString(environmentAsanBlock)
