@@ -55,7 +55,7 @@ func (t Template) GenerateBuildSteps(f Fuzzer) bytes.Buffer {
 			buf.WriteString(asanBuildSteps)
 		}
 		// Ensure we're running things from build files dir
-		buf.WriteString("cd $BUILD_FILES")
+		buf.WriteString("cd $BUILD_FILES\n")
 		for _, line := range f.BuildSteps() {
 			buf.WriteString(fmt.Sprintf("%s\n", line))
 		}
