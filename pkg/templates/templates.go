@@ -16,6 +16,7 @@ type Fuzzer interface {
 	Run() string           // The binary or fuzzer zip location
 	MemoryLimit() string
 	Options() string
+	Corpus() string // Returns the location of the corpus relative to project root
 }
 
 // New returns a new Template struct
@@ -75,6 +76,8 @@ func (t Template) GenerateEnvironment(f Fuzzer) bytes.Buffer {
 	if t.ASAN {
 		buf.WriteString(environmentAsanBlock)
 	}
+
+	buf.WriteString(fmt.Sprintf("export CORPUS=%s\n", f.Corpus()))
 
 	switch t.Language {
 	case maxfuzz.Go:

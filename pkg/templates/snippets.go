@@ -6,7 +6,7 @@ package templates
 
 var buildStepsPrefix = `
 #### Build environment setup
-cp $BUILD_FILES/examples/* /root/fuzz_in/
+cp $CORPUS/* /root/fuzz_in/
 cd /root
 `
 
