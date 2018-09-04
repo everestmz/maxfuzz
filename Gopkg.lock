@@ -241,6 +241,14 @@
   revision = "b5e368500d0a508ef8f16e9c2d4025a8a46bcc29"
   version = "v3.6.4"
 
+[[projects]]
+  digest = "1:b24d38b282bacf9791408a080f606370efa3d364e4b5fd9ba0f7b87786d3b679"
+  name = "gopkg.in/urfave/cli.v1"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "cfb38830724cc34fedffe9a2a29fb54fa9169cd1"
+  version = "v1.20.0"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
@@ -260,6 +268,7 @@
     "github.com/spf13/afero",
     "github.com/stretchr/testify/assert",
     "github.com/thejerf/suture",
+    "gopkg.in/urfave/cli.v1",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

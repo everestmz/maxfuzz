@@ -1,9 +1,11 @@
-all: build deploy-dev
+# Image stuff
 
-build-fresh:
+all: build-base deploy-dev
+
+build-base-fresh:
 	docker build -t maxfuzz ./fuzzer-base --no-cache
 
-build:
+build-base:
 	docker build -t maxfuzz ./fuzzer-base
 
 teardown:
@@ -17,3 +19,8 @@ deploy-stable: teardown
 deploy-dev: teardown
 	SYNC_DIR=$(shell pwd)/sync docker-compose -f docker-compose-dev.yml build
 	SYNC_DIR=$(shell pwd)/sync docker-compose -f docker-compose-dev.yml up
+
+# CLI stuff
+
+build-cli:
+	go build -o ./bin/maxfuzz ./cmd/maxfuzz
