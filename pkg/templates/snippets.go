@@ -43,8 +43,8 @@ export ASAN_SYMBOLIZER_PATH="/root/third_party/llvm-build/Release+Asserts/bin/ll
 var pythonEnvironmentSettings = `
 export AFL_FUZZ="py-afl-fuzz"
 export AFL_BINARY=%s
-export AFL_MEMORY_LIMIT=%s
-export AFL_OPTIONS="%s"
+export AFL_MEMORY_LIMIT=%s // size in MB or "none"
+export AFL_OPTIONS="%s" // extra command line flags for AFL
 `
 
 var genericEnvironmentSettings = `

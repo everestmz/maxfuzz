@@ -13,3 +13,4 @@ fuzzer-base/fuzz_out
 !.vscode/launch.json
 !.vscode/extensions.json
 vendor/
+bin/
