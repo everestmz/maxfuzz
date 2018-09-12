@@ -70,6 +70,7 @@ RUN apt-get install -y libv4l-dev
 # Download AFL and uncompress
 RUN wget http://lcamtuf.coredump.cx/afl/releases/afl-$AFL_VERSION.tgz
 RUN tar -xvf afl-$AFL_VERSION.tgz
+RUN rm afl-$AFL_VERSION.tgz
 RUN mv afl-$AFL_VERSION afl
 
 # Inject our own AFL config header file
@@ -105,8 +106,7 @@ RUN mkdir ~/fuzz_in
 ############################
 
 # Setup logging and scripts & install Go libs
-RUN mkdir /root/logs
-WORKDIR /root/go/src/maxfuzz/fuzzer-base
+WORKDIR /root/go/src/github.com/everestmz/maxfuzz/fuzzer-base
 RUN wget https://github.com/golang/dep/releases/download/v$GO_DEP_VERSION/dep-linux-amd64
 RUN mv dep-linux-amd64 /usr/local/bin/dep
 ENV PATH=/usr/lib/go-1.9/bin/:$PATH
@@ -114,22 +114,24 @@ RUN chmod +x /usr/local/bin/dep
 RUN go get -u github.com/dvyukov/go-fuzz/...
 
 # Copy Go files into container & compile binaries
-RUN mkdir -p /root/go/src/maxfuzz/fuzzer-base
-WORKDIR /root/go/src/maxfuzz/fuzzer-base
-COPY ./cmd /root/go/src/maxfuzz/fuzzer-base/cmd
-COPY ./internal /root/go/src/maxfuzz/fuzzer-base/internal
-COPY ./Gopkg.lock /root/go/src/maxfuzz/fuzzer-base/Gopkg.lock
-COPY ./Gopkg.toml /root/go/src/maxfuzz/fuzzer-base/Gopkg.toml
-COPY ./Makefile /root/go/src/maxfuzz/fuzzer-base/Makefile
+RUN mkdir -p /root/go/src/github.com/everestmz/maxfuzz/fuzzer-base
+WORKDIR /root/go/src/github.com/everestmz/maxfuzz/fuzzer-base
+COPY ./cmd /root/go/src/github.com/everestmz/maxfuzz/fuzzer-base/cmd
+COPY ./internal /root/go/src/github.com/everestmz/maxfuzz/fuzzer-base/internal
+COPY ./Gopkg.lock /root/go/src/github.com/everestmz/maxfuzz/fuzzer-base/Gopkg.lock
+COPY ./Gopkg.toml /root/go/src/github.com/everestmz/maxfuzz/fuzzer-base/Gopkg.toml
+COPY ./Makefile /root/go/src/github.com/everestmz/maxfuzz/fuzzer-base/Makefile
 RUN make && make install
 WORKDIR /root
 
-#################################
-# FINAL SETUP & COPYING SCRIPTS #
-#################################
+###############
+# FINAL SETUP #
+###############
 
-RUN mkdir fuzzer-files
-COPY ./scripts ./scripts
-COPY ./fuzzer-files/base ./fuzzer-files/base
-RUN chmod -R 755 /root/fuzzer-files
-RUN chmod 755 /root/scripts/reproduce_stdin
+# Move everything to bins
+RUN mv /root/afl /usr/local/bin/afl
+RUN mv -t /usr/local/bin /root/python-afl/py-afl-cmin  /root/python-afl/py-afl-fuzz  /root/python-afl/py-afl-showmap  /root/python-afl/py-afl-tmin
+RUN mv /root/go/bin/maxfuzz /usr/local/bin/maxfuzz
+RUN rm -rf /root/afl
+RUN rm -rf /root/python-afl
+RUN rm -rf /root/go

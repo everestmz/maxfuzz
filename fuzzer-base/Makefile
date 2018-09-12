@@ -13,13 +13,14 @@ test:
 	@echo "=============="
 
 build:
-	go build -o ./bin/monitor ./cmd/monitor
-	go build -o ./bin/go-monitor ./cmd/go-monitor
-	go build -o ./bin/pre-sync ./cmd/pre-sync
-	go build -o ./bin/reproduce ./cmd/reproduce
+	# go build -o ./bin/monitor ./cmd/monitor
+	# go build -o ./bin/go-monitor ./cmd/go-monitor
+	# go build -o ./bin/pre-sync ./cmd/pre-sync
+	# go build -o ./bin/reproduce ./cmd/reproduce
+	go build -o ./bin/maxfuzz ./cmd/maxfuzz
 
 install:
-	mv -t ${GOBIN} ./bin/monitor ./bin/pre-sync ./bin/reproduce ./bin/go-monitor
+	mv -t ${GOBIN} ./bin/maxfuzz
 
 teardown:
 	docker-compose down

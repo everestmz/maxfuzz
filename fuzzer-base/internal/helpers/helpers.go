@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"maxfuzz/fuzzer-base/internal/reproduction"
-
 	"github.com/howeyc/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -17,10 +15,20 @@ var log = BasicLogger()
 var fs = afero.NewOsFs()
 var fuzzer = Getenv("FUZZER_NAME", "test")
 var revision = Getenv("GIT_SHA", "no_git")
-var reproductionQueue = reproduction.NewProducer(
-	Getenv("REDIS_QUEUE_URL", ""),
-	fuzzer,
-)
+
+func MaxfuzzOptions() map[string]string {
+	result := GetenvOrDie("MAXFUZZ_OPTIONS")
+	ret := map[string]string{}
+	split := strings.Split(result, ":")
+	for _, v := range split {
+		vals := strings.Split(v, "=")
+		key := vals[0]
+		val := vals[1]
+		ret[key] = val
+	}
+
+	return ret
+}
 
 func Getenv(key, def string) string {
 	temp := os.Getenv(key)
@@ -136,10 +144,12 @@ func GetBackup(location string, destination string) {
 func RegularBackup(fileName string) {
 	// Compresses the entire fuzzer state at a regular interval and saves it
 	// Either to S3 or local fileystem
-	if S3Enabled() {
-		s3RegularBackup(fs, fileName, log)
-	} else {
-		filesystemRegularBackup(fs, fileName, log)
+	for {
+		if S3Enabled() {
+			s3RegularBackup(fs, fileName, log)
+		} else {
+			filesystemRegularBackup(fs, fileName, log)
+		}
 	}
 }
 
@@ -152,7 +162,7 @@ func WatchFile(w *fsnotify.Watcher) {
 		case ev := <-w.Event:
 			if ev.IsCreate() {
 				if !strings.Contains(ev.Name, "README.txt") {
-					uploadName, crashType := GenerateTestcaseName(ev.Name)
+					uploadName, _ := GenerateTestcaseName(ev.Name)
 					if S3Enabled() {
 						s3Upload(fs, ev.Name, uploadName, log)
 					} else {
@@ -160,11 +170,6 @@ func WatchFile(w *fsnotify.Watcher) {
 					}
 					if os.Getenv("NO_REPRODUCTION") != "1" &&
 						os.Getenv("MAXFUZZ_ENV") == "fuzzer" {
-						reproduction.Produce(
-							reproductionQueue,
-							uploadName,
-							crashType,
-						)
 					}
 				}
 			}
