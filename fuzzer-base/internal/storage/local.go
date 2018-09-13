@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/everestmz/maxfuzz/fuzzer-base/internal/constants"
@@ -25,7 +26,7 @@ func (h LocalStorageHandler) BackupExists() (bool, error) {
 	result, err := afero.Exists(
 		fs,
 		filepath.Join(
-			constants.LocalBackupDirectory, h.targetName, "backup.zip",
+			constants.LocalSyncDirectory, h.targetName, "backup.zip",
 		),
 	)
 	if err != nil {
@@ -39,12 +40,17 @@ func (h LocalStorageHandler) filesystemSync(source, destination string) error {
 	if err != nil {
 		return fmt.Errorf("File existence check fail: %s", err.Error())
 	}
+	destination = filepath.Join(constants.LocalSyncDirectory, destination)
+	err = os.MkdirAll(filepath.Dir(destination), 0744)
+	if err != nil {
+		return fmt.Errorf("Cannot make directory: %s", err.Error())
+	}
 	if exists {
 		data, err := afero.ReadFile(fs, source)
 		if err != nil {
 			return fmt.Errorf("Error reading file: %s", err.Error())
 		}
-		err = afero.WriteFile(fs, filepath.Join(constants.LocalBackupDirectory, destination), data, 0755)
+		err = afero.WriteFile(fs, destination, data, 0744)
 		if err != nil {
 			return fmt.Errorf("Error writing file: %s", err.Error())
 		}
@@ -74,7 +80,7 @@ func (h LocalStorageHandler) filesystemDownload(source, destination string) erro
 
 func (h LocalStorageHandler) GetBackup() (string, error) {
 	backupLocation := filepath.Join(
-		constants.LocalBackupDirectory, h.targetName, "backup.zip",
+		constants.LocalSyncDirectory, h.targetName, "backup.zip",
 	)
 
 	err := h.filesystemDownload(backupLocation, constants.FuzzerBackupLocation)
@@ -83,12 +89,12 @@ func (h LocalStorageHandler) GetBackup() (string, error) {
 
 func (h LocalStorageHandler) MakeBackup() error {
 	destination := filepath.Join(h.targetName, "backup.zip")
-	err := h.filesystemSync(constants.FuzzerOutputDirectory, destination)
+	err := h.filesystemSync(constants.FuzzerBackupLocation, destination)
 	return err
 }
 
 func (h LocalStorageHandler) SavePayload(source string) error {
-	destination := filepath.Join(h.targetName, source)
+	destination := filepath.Join(h.targetName, filepath.Base(source))
 	err := h.filesystemSync(source, destination)
 	return err
 }

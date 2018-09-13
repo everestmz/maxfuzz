@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/everestmz/maxfuzz/fuzzer-base/internal/helpers"
+
 	"github.com/everestmz/maxfuzz/fuzzer-base/internal/constants"
 	"github.com/everestmz/maxfuzz/fuzzer-base/internal/logging"
 	"github.com/everestmz/maxfuzz/fuzzer-base/internal/storage"
@@ -27,8 +29,8 @@ var aflCmdOptions = cmd.Options{
 func NewCFuzzer(target string) *suture.Supervisor {
 	log := logging.NewTargetLogger(target)
 	ret := New(log, target)
-	ret.Add(NewBackupService(log))
-	ret.Add(NewAFLCrashService(log))
+	ret.Add(NewBackupService(target, log))
+	ret.Add(NewAFLCrashService(target, log))
 	ret.Add(CFuzzerService{
 		logging.NewTargetLogger(target),
 		target,
@@ -99,14 +101,15 @@ func (s CFuzzerService) Serve() {
 	s.logger.Info(fmt.Sprintf("CFuzzerService running fuzzer"))
 	command = setupAFLCmd()
 	stop = make(chan bool)
-	go commandLogger(command, stop)
-
+	opts := helpers.MaxfuzzOptions()
+	if opts["suppressFuzzerOutput"] != "1" {
+		go commandLogger(command, stop)
+	}
 	command.Start()
 	status = command.Status()
 	for status.StopTs == 0 {
 		status = command.Status()
 		if len(s.stop) > 0 {
-			s.logger.Info(fmt.Sprintf("AAAAAAA"))
 			<-s.stop
 			s.logger.Info(fmt.Sprintf("CFuzzerService spinning down fuzzer"))
 			return

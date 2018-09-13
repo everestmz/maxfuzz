@@ -7,6 +7,6 @@ services:
       - ${SYNC_DIR}:/root/sync
       - ${TARGET_DIR}:/root/targets
     environment:
-      - MAXFUZZ_OPTIONS=storageSolution=local
+      - MAXFUZZ_OPTIONS=storageSolution=local:suppressFuzzerOutput=1
     ports:
       - "8080:8080"

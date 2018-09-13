@@ -77,6 +77,7 @@ func fuzz() {
 			time.Sleep(time.Second)
 		default:
 			// Get "next" target from list, set next to new one, set supervisor to fuzz target
+			// TODO: don't restart the fuzzer if we don't have any other ones to pick from
 			logMessage(fmt.Sprintf("Fuzzer target status: %+v", targetsTimer)).Info()
 			currentTarget = nextTarget()
 			fuzzerSupervisor = supervisor.New(logging.NewFuzzerLogger(currentTarget), currentTarget)

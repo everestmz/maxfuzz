@@ -29,20 +29,30 @@ func commandLogger(command *cmd.Cmd, stop chan bool) {
 }
 
 func preFuzzCleanup() {
+	// TODO: more reliable cleanup. Consider snapshotting the environment & filesystem,
+	// and then replacing these in between fuzz cycles. If it takes a few mins, it's
+	// definitely worthwhile
+
 	// Remove directories that shouldn't be there but may have been set up by maxfuzz
 	os.RemoveAll("/root/TMP_CLANG")
+	os.RemoveAll(constants.FuzzerBackupLocation)
 
-	// Clear environment variables that were set by maxfuzz
+	// Clear environment variables
+	// Maxfuzz
 	os.Unsetenv("BUILD_FILES")
 	os.Unsetenv("CORPUS")
 	os.Unsetenv("FUZZER_NAME")
+	// Sanitizers
 	os.Unsetenv("AFL_USE_ASAN")
 	os.Unsetenv("ASAN_OPTIONS")
 	os.Unsetenv("ASAN_SYMBOLIZER_PATH")
+	// AFL
 	os.Unsetenv("AFL_FUZZ")
 	os.Unsetenv("AFL_BINARY")
 	os.Unsetenv("AFL_MEMORY_LIMIT")
 	os.Unsetenv("AFL_OPTIONS")
+	// C/C++
+	os.Unsetenv("LD_PRELOAD")
 }
 
 func initialFuzzerSetup(l logging.Logger, h storage.StorageHandler) error {
