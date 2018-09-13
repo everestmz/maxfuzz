@@ -3,3 +3,10 @@ docker-compose.yml
 */README.md
 */new_fuzzer.rb
 */template
+*/README.md
+README.md
+Dockerfile
+docker-compose.yml
+bin
+sync
+vendor

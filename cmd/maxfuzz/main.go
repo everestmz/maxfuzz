@@ -1,113 +1,116 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"log"
-	"os"
-	"path/filepath"
+	"net/http"
+	"sync"
 
-	"github.com/everestmz/maxfuzz/pkg/templates"
+	"github.com/everestmz/maxfuzz/internal/logging"
+	"github.com/everestmz/maxfuzz/internal/supervisor"
 
-	"github.com/everestmz/maxfuzz/pkg/utils"
-	cli "gopkg.in/urfave/cli.v1"
+	"github.com/gin-gonic/gin"
+	"github.com/thejerf/suture"
 )
 
-func newFuzzer(c *cli.Context) error {
-	fuzzerName := c.Args().Get(0)
-	dir := c.Args().Get(1)
-	language := c.String("lang")
-	base := c.String("base")
+type Target struct {
+	ID       string `json:"id"`
+	Language string `json:"language"`
+	Location string `json:"location"`
+}
 
-	// Verify inputs
-	dir, err := filepath.Abs(dir)
+var targets map[string]*Target
+var targetsTimer map[string]int64
+var targetsLock sync.RWMutex
+var fuzzerSupervisor *suture.Supervisor
+
+func deserializeTarget(c *gin.Context) (*Target, error) {
+	ret := Target{}
+	b, err := c.GetRawData()
 	if err != nil {
-		return err
+		return &ret, err
 	}
-	_, err = os.Stat(dir)
-	if os.IsNotExist(err) {
-		os.MkdirAll(dir, 0755)
-	}
-	if !utils.SupportedLanguage(language) {
-		return fmt.Errorf("language %s not supported", language)
-	}
-	if !utils.SupportedBase(base) {
-		return fmt.Errorf("base %s not supported", base)
-	}
-
-	log.Println(fmt.Sprintf("Creating new fuzzer in %s", dir))
-	// Setup templates
-	log.Println("Templating...")
-	f := BlankFuzzer{}
-	template, err := templates.New(fuzzerName, language, c.Bool("asan"), base)
+	err = json.Unmarshal(b, &ret)
 	if err != nil {
-		return err
+		return &ret, err
 	}
+	return &ret, nil
+}
 
-	// Write Start File
-	log.Println("Writing start file...")
-	startFileBuffer := template.GenerateStartFile()
-	err = ioutil.WriteFile(filepath.Join(dir, "start"), startFileBuffer.Bytes(), 0755)
+func listTargets(c *gin.Context) {
+	targetsLock.RLock()
+	targetArray := []*Target{}
+	for _, v := range targets {
+		targetArray = append(targetArray, v)
+	}
+	targetsLock.RUnlock()
+	c.JSON(http.StatusOK, targetArray)
+}
+
+func registerTarget(c *gin.Context) {
+	log.Info("Received register request...")
+	t, err := deserializeTarget(c)
 	if err != nil {
-		return fmt.Errorf("error writing start file: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
+	log := logging.NewTargetLogger(t.ID)
+	log.Info("Registering target...")
 
-	// Write build_steps
-	log.Println("Writing build steps...")
-	buildStepsFileBuffer := template.GenerateBuildSteps(f)
-	err = ioutil.WriteFile(filepath.Join(dir, "build_steps"), buildStepsFileBuffer.Bytes(), 0755)
+	targetsLock.Lock()
+	_, exists := targets[t.ID]
+	if exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Target %s already exists", t.ID)})
+		targetsLock.Unlock()
+		return
+	}
+	targets[t.ID] = t
+	targetsTimer[t.ID] = 0
+	targetsLock.Unlock()
+
+	log.Info("Target registered")
+	c.JSON(http.StatusOK, t)
+}
+
+func unregisterTarget(c *gin.Context) {
+	t, err := deserializeTarget(c)
 	if err != nil {
-		return fmt.Errorf("error writing build_steps file: %s", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
-
-	// Write environment file
-	log.Println("Writing environment...")
-	environmentFileBuffer := template.GenerateEnvironment(f)
-	err = ioutil.WriteFile(filepath.Join(dir, "environment"), environmentFileBuffer.Bytes(), 0755)
-	if err != nil {
-		return fmt.Errorf("error writing environment file: %s")
+	log := logging.NewTargetLogger(t.ID)
+	log.Info("Unregistering target...")
+	targetsLock.Lock()
+	_, exists := targets[t.ID]
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Target %s does not exist", t.ID)})
+		targetsLock.Unlock()
+		return
 	}
-
-	// Make corpus directory
-	log.Println("Making corpus directory...")
-	os.MkdirAll(filepath.Join(dir, "corpus"), 0755)
-
-	return nil
+	delete(targets, t.ID)
+	delete(targetsTimer, t.ID)
+	targetsLock.Unlock()
+	interruptTarget(t.ID)
+	log.Info("Target unregistered")
+	if len(targets) == 0 {
+		log.Info("0 targets registered. Maxfuzz on standby...")
+	}
+	c.JSON(http.StatusOK, t)
 }
 
 func main() {
-	app := cli.NewApp()
-	app.Name = "maxfuzz"
-	app.Usage = "do fuzzery things"
+	targetsLock = sync.RWMutex{}
+	targets = map[string]*Target{}
+	targetsTimer = map[string]int64{}
 
-	app.Commands = []cli.Command{
-		{
-			Name:      "new",
-			Aliases:   []string{"n"},
-			Usage:     "create a new fuzzer",
-			Action:    newFuzzer,
-			ArgsUsage: "[fuzzer name] [target directory]",
-			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:  "lang",
-					Value: "c",
-					Usage: "programming language",
-				},
-				cli.StringFlag{
-					Name:  "base",
-					Value: "ubuntu:xenial",
-					Usage: "base maxfuzz image to use",
-				},
-				cli.BoolFlag{
-					Name:  "asan",
-					Usage: "set this to fuzz with asan",
-				},
-			},
-		},
-	}
+	fuzzerLogger := logging.NewFuzzerLogger("")
+	fuzzerSupervisor = supervisor.New(fuzzerLogger, "maxfuzz")
 
-	err := app.Run(os.Args)
-	if err != nil {
-		panic(err)
-	}
+	go fuzz()
+
+	router := gin.Default()
+	router.GET("/targets", listTargets)
+	router.POST("/registerTarget", registerTarget)
+	router.POST("/unregisterTarget", unregisterTarget)
+	router.Run(":8080")
 }

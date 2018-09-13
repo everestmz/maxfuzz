@@ -69,9 +69,7 @@ func (t Template) GenerateBuildSteps(f Fuzzer) bytes.Buffer {
 func (t Template) GenerateEnvironment(f Fuzzer) bytes.Buffer {
 	var buf bytes.Buffer
 	buf.WriteString(shellPrefix)
-	buf.WriteString(fmt.Sprintf(
-		environmentPrefix, t.FuzzerName, t.FuzzerName),
-	)
+	buf.WriteString(fmt.Sprintf(environmentPrefix, t.FuzzerName))
 
 	if t.ASAN {
 		buf.WriteString(environmentAsanBlock)
@@ -101,23 +99,9 @@ func (t Template) GenerateEnvironment(f Fuzzer) bytes.Buffer {
 			),
 		)
 	}
-
+	buf.WriteString("\n# Custom Environment Variables\n")
 	for _, line := range f.Environment() {
 		buf.WriteString(fmt.Sprintf("export %s\n", line))
-	}
-
-	return buf
-}
-
-// GenerateStartFile returns full start file
-func (t Template) GenerateStartFile() bytes.Buffer {
-	var buf bytes.Buffer
-	buf.WriteString(shellPrefix)
-	switch t.Language {
-	case maxfuzz.Go:
-		buf.WriteString(fmt.Sprintf(goStartScript, t.FuzzerName))
-	default:
-		buf.WriteString(fmt.Sprintf(genericStartScript, t.FuzzerName))
 	}
 
 	return buf

@@ -24,11 +24,6 @@
 #   go-tests = true
 #   unused-packages = true
 
-
-[[constraint]]
-  branch = "master"
-  name = "astuart.co/go-sse"
-
 [[constraint]]
   name = "github.com/adjust/rmq"
   version = "1.0.0"
@@ -40,14 +35,6 @@
 [[constraint]]
   name = "github.com/go-cmd/cmd"
   version = "1.0.3"
-
-[[constraint]]
-  name = "github.com/graphql-go/graphql"
-  version = "0.7.6"
-
-[[constraint]]
-  name = "github.com/graphql-go/handler"
-  version = "0.2.1"
 
 [[constraint]]
   name = "github.com/howeyc/fsnotify"
