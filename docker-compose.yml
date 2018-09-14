@@ -6,6 +6,7 @@ services:
     volumes:
       - ${SYNC_DIR}:/root/sync
       - ${TARGET_DIR}:/root/targets
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - MAXFUZZ_OPTIONS=storageSolution=local:suppressFuzzerOutput=1
     ports:

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/everestmz/maxfuzz/internal/constants"
@@ -55,67 +56,63 @@ func preFuzzCleanup() {
 	os.Unsetenv("LD_PRELOAD")
 }
 
-func initialFuzzerSetup(l logging.Logger, h storage.StorageHandler) error {
+func initialFuzzerSetup(target string, l logging.Logger, h storage.StorageHandler) (string, error) {
+	targetDir := filepath.Join(constants.LocalTargetDirectory, target)
+	syncDir := filepath.Join(constants.LocalSyncDirectory, target)
+
 	// Download and uncompress fuzzer context
 	compressedTarget, err := h.GetTarget()
 	if err != nil {
 		l.Error(fmt.Sprintf("Could not get target: %s", err.Error()))
-		return err
+		return "", err
 	}
 
-	err = archiver.Zip.Open(compressedTarget, constants.FuzzerLocation)
+	err = archiver.Zip.Open(compressedTarget, targetDir)
 	if err != nil {
 		l.Error(fmt.Sprintf("Could not uncompress target: %s", err.Error()))
-		return err
+		return "", err
 	}
 
 	err = os.Remove(compressedTarget)
 	if err != nil {
 		l.Error(fmt.Sprintf("Could not remove compressed target: %s", err.Error()))
-		return err
+		return "", err
 	}
 
 	// Check if any backup exists, and use it instead
 	exists, err := h.BackupExists()
 	if err != nil {
 		l.Error(fmt.Sprintf("Could not check if backup exists: %s", err.Error()))
-		return err
+		return "", err
 	}
 	if exists {
-		err = os.Remove(constants.FuzzerOutputDirectory)
+		err = os.Remove(syncDir)
 		if err != nil {
 			l.Error(fmt.Sprintf("Could not remove compressed target: %s", err.Error()))
-			return err
+			return "", err
 		}
 
 		compressedBackup, err := h.GetBackup()
 		if err != nil {
 			l.Error(fmt.Sprintf("Could not get backup: %s", err.Error()))
-			return err
+			return "", err
 		}
 
-		err = archiver.Zip.Open(compressedBackup, constants.FuzzerOutputDirectory)
+		err = archiver.Zip.Open(compressedBackup, syncDir)
 		if err != nil {
 			l.Error(fmt.Sprintf("Could not uncompress backup: %s", err.Error()))
-			return err
+			return "", err
 		}
 
 		err = os.Remove(compressedBackup)
 		if err != nil {
 			l.Error(fmt.Sprintf("Could not remove compressed backup: %s", err.Error()))
-			return err
+			return "", err
 		}
 
-		os.Setenv("AFL_IO_OPTIONS", "-i- -o /root/fuzz_out")
-		if err != nil {
-			l.Error(fmt.Sprintf("Could not write to afl-io-options: %s", err.Error()))
-			return err
-		}
-	} else {
-		os.Setenv("AFL_IO_OPTIONS", "-i /root/fuzz_in -o /root/fuzz_out")
+		return "-i- -o /root/fuzz_out", nil
 	}
-
-	return err
+	return "-i /root/fuzz_in -o /root/fuzz_out", nil
 }
 
 func setupAFLCmd() *cmd.Cmd {

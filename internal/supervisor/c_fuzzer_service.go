@@ -55,7 +55,7 @@ func (s CFuzzerService) Serve() {
 
 	// Pre-run sync and download steps
 	s.logger.Info(fmt.Sprintf("CFuzzerService setting up target"))
-	err = initialFuzzerSetup(s.logger, storageHandler)
+	aflIoOptions, err := initialFuzzerSetup(s.targetID, s.logger, storageHandler)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("CFuzzerService could not initialize fuzzer: %s", err.Error()))
 		return
@@ -84,6 +84,16 @@ func (s CFuzzerService) Serve() {
 	status := command.Status()
 	for status.StopTs == 0 {
 		status = command.Status()
+		if len(s.stop) > 0 {
+			<-s.stop
+			s.logger.Info(fmt.Sprintf("CFuzzerService spinning down fuzzer"))
+			command.Stop()
+			for status.StopTs == 0 {
+				s.logger.Info(fmt.Sprintf("%+v", status.Runtime))
+				status = command.Status()
+			}
+			return
+		}
 	}
 
 	stop <- true
@@ -111,6 +121,7 @@ func (s CFuzzerService) Serve() {
 		if len(s.stop) > 0 {
 			<-s.stop
 			s.logger.Info(fmt.Sprintf("CFuzzerService spinning down fuzzer"))
+			command.Stop()
 			return
 		}
 	}
