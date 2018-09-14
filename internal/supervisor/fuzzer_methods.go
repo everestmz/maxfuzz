@@ -106,26 +106,11 @@ func initialFuzzerSetup(l logging.Logger, h storage.StorageHandler) error {
 			return err
 		}
 
-		err = os.Remove(constants.AFLIOOptions)
-		if err != nil {
-			l.Error(fmt.Sprintf("Could not remove afl-io-options: %s", err.Error()))
-			return err
-		}
-
-		f, err := os.Create(constants.AFLIOOptions)
-		if err != nil {
-			l.Error(fmt.Sprintf("Could not create afl-io-options: %s", err.Error()))
-			return err
-		}
-
-		toWrite := []byte("-i- -o /root/fuzz_out")
 		os.Setenv("AFL_IO_OPTIONS", "-i- -o /root/fuzz_out")
-		_, err = f.Write(toWrite)
 		if err != nil {
 			l.Error(fmt.Sprintf("Could not write to afl-io-options: %s", err.Error()))
 			return err
 		}
-		f.Close()
 	} else {
 		os.Setenv("AFL_IO_OPTIONS", "-i /root/fuzz_in -o /root/fuzz_out")
 	}
