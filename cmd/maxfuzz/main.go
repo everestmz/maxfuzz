@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/everestmz/maxfuzz/internal/docker"
 	"github.com/everestmz/maxfuzz/internal/logging"
 	"github.com/everestmz/maxfuzz/internal/supervisor"
 
@@ -102,6 +103,10 @@ func main() {
 	targetsLock = sync.RWMutex{}
 	targets = map[string]*Target{}
 	targetsTimer = map[string]int64{}
+	err := docker.Init()
+	if err != nil {
+		panic(err)
+	}
 
 	fuzzerLogger := logging.NewFuzzerLogger("")
 	fuzzerSupervisor = supervisor.New(fuzzerLogger, "maxfuzz")

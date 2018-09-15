@@ -3,8 +3,10 @@ package supervisor
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/everestmz/maxfuzz/internal/constants"
+	"github.com/everestmz/maxfuzz/internal/docker"
 	"github.com/everestmz/maxfuzz/internal/helpers"
 	"github.com/everestmz/maxfuzz/internal/logging"
 	"github.com/everestmz/maxfuzz/internal/storage"
@@ -41,12 +43,10 @@ func NewCFuzzer(target string) *suture.Supervisor {
 func (s CFuzzerService) Stop() {
 	s.logger.Info(fmt.Sprintf("CFuzzerService stopping"))
 	s.stop <- true
-	os.Remove(constants.FuzzerLocation)
 }
 
 func (s CFuzzerService) Serve() {
 	s.logger.Info(fmt.Sprintf("CFuzzerService starting"))
-	preFuzzCleanup()
 	storageHandler, err := storage.Init(s.targetID)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("CFuzzerService could not initialize storageHandler: %s", err.Error()))
@@ -61,77 +61,68 @@ func (s CFuzzerService) Serve() {
 		return
 	}
 
-	// Ensure that we have the correct environment populated
-	s.logger.Info(fmt.Sprintf("CFuzzerService populating environment"))
-	env, err := os.Open(constants.FuzzerEnvironment)
+	// Get environment
+	environmentFile, err := os.Open(filepath.Join(constants.LocalTargetDirectory, s.targetID, "environment"))
 	if err != nil {
-		s.logger.Error("CFuzzerService could not open environnment file")
+		s.logger.Error(fmt.Sprintf("CFuzzerService could not parse the environment: %s", err.Error()))
 		return
 	}
-
-	pairs := gotenv.Parse(env)
-	for k, v := range pairs {
-		os.Setenv(k, v)
-	}
+	environment := gotenv.Parse(environmentFile)
 
 	// Run the build steps
 	s.logger.Info(fmt.Sprintf("CFuzzerService running build steps"))
-	command := cmd.NewCmdOptions(aflCmdOptions, constants.FuzzerBuildSteps)
-	stop := make(chan bool)
-	go commandLogger(command, stop)
-
-	command.Start()
-	status := command.Status()
-	for status.StopTs == 0 {
-		status = command.Status()
-		if len(s.stop) > 0 {
-			<-s.stop
-			s.logger.Info(fmt.Sprintf("CFuzzerService spinning down fuzzer"))
-			command.Stop()
-			for status.StopTs == 0 {
-				s.logger.Info(fmt.Sprintf("%+v", status.Runtime))
-				status = command.Status()
-			}
-			return
-		}
-	}
-
-	stop <- true
-	if status.Error != nil {
-		s.logger.Error(fmt.Sprintf("CFuzzerService build steps failed with error: %s", status.Error.Error()))
-		return
-	}
-	if status.Exit != 0 {
-		s.logger.Error(fmt.Sprintf("Build steps stopped with exit code %v", status.Exit))
+	config, err := docker.CreateFuzzer(s.targetID, s.stop)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("CFuzzerService could not build the fuzzer: %s", err.Error()))
 		return
 	}
 
 	// Finally, run the fuzzer
 	s.logger.Info(fmt.Sprintf("CFuzzerService running fuzzer"))
-	command = setupAFLCmd()
-	stop = make(chan bool)
+	command, err := setupAFLCmd(environment, aflIoOptions)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("CFuzzerService could not set up the fuzz command: %s", err.Error()))
+		return
+	}
+
 	opts := helpers.MaxfuzzOptions()
 	if opts["suppressFuzzerOutput"] != "1" {
-		go commandLogger(command, stop)
+		//TODO: ensure that we can suppress this output
 	}
-	command.Start()
-	status = command.Status()
-	for status.StopTs == 0 {
-		status = command.Status()
+
+	fuzzCluster, err := config.Deploy(command, stdoutWriter{}, stderrWriter{})
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("CFuzzerService could not start the fuzzer: %s", err.Error()))
+		return
+	}
+
+	clusterState, err := fuzzCluster.State()
+	if err != nil {
+		s.logger.Error(fmt.Sprintf("CFuzzerService could not start the fuzzer: %s", err.Error()))
+		return
+	}
+
+	for clusterState.Running() {
+		clusterState, err = fuzzCluster.State()
+		if err != nil {
+			s.logger.Error(fmt.Sprintf("CFuzzerService could not start the fuzzer: %s", err.Error()))
+			return
+		}
+
+		// TODO: Work out why fuzzer doesn't spin down on stop
 		if len(s.stop) > 0 {
 			<-s.stop
 			s.logger.Info(fmt.Sprintf("CFuzzerService spinning down fuzzer"))
-			command.Stop()
+			err = fuzzCluster.Kill()
+			if err != nil {
+				s.logger.Error(fmt.Sprintf("CFuzzerService could not spin down the fuzzer: %s", err.Error()))
+			}
 			return
 		}
 	}
 
-	if status.Error != nil {
-		s.logger.Error(fmt.Sprintf("CFuzzerService fuzzing failed with error: %s", status.Error.Error()))
-		return
-	}
-	if status.Exit != 0 {
-		s.logger.Error(fmt.Sprintf("CFuzzerService fuzzer stopped with exit code %v", status.Exit))
-		return
-	}
+	s.logger.Error(
+		fmt.Sprintf(
+			"CFuzzerService fuzz cluster stopped unexpectedly\nErrors: %s\nExit code: %s",
+			err.Error(), clusterState.ExitCode()))
 }

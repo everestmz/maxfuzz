@@ -6,10 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/subosito/gotenv"
-
 	"github.com/everestmz/maxfuzz/internal/constants"
+
 	d "github.com/fsouza/go-dockerclient"
+	multierror "github.com/hashicorp/go-multierror"
+	"github.com/subosito/gotenv"
 )
 
 var client *d.Client
@@ -49,12 +50,13 @@ func (c *FuzzClusterConfiguration) Deploy(command []string, stdout, stderr io.Wr
 					ReadOnly: false,
 				},
 				{
-					Target:   constants.FuzzerSyncDirectory,
+					Target:   constants.FuzzerOutputDirectory,
 					Source:   c.syncDirectory,
 					Type:     "bind",
 					ReadOnly: false,
 				},
 			},
+			AutoRemove: true,
 		},
 		NetworkingConfig: &d.NetworkingConfig{},
 	}
@@ -101,12 +103,31 @@ func (c *FuzzCluster) State() (*FuzzClusterState, error) {
 	return toReturn, nil
 }
 
+func (c *FuzzCluster) Kill() error {
+	var result *multierror.Error
+	multierror.Append(result,
+		client.StopContainer(c.Fuzzer, 1),
+		client.RemoveContainer(
+			d.RemoveContainerOptions{
+				ID:    c.Fuzzer,
+				Force: true,
+			},
+		),
+	)
+
+	return result.ErrorOrNil()
+}
+
 type FuzzClusterState struct {
 	Fuzzer d.State
 }
 
 func (s *FuzzClusterState) Running() bool {
 	return s.Fuzzer.Running
+}
+
+func (s *FuzzClusterState) ExitCode() int {
+	return s.Fuzzer.ExitCode
 }
 
 func followContainer(id string) error {
@@ -146,6 +167,8 @@ func CreateFuzzer(target string, stop chan bool) (*FuzzClusterConfiguration, err
 		Target: target,
 	}
 
+	//TODO: Make sure all old containers are killed and removed (buildbox, fuzzer, repro)
+
 	environmentFile, err := os.Open(filepath.Join(constants.LocalTargetDirectory, target, "environment"))
 	if err != nil {
 		return nil, err
@@ -183,7 +206,7 @@ func CreateFuzzer(target string, stop chan bool) (*FuzzClusterConfiguration, err
 					ReadOnly: false,
 				},
 				{
-					Target:   constants.FuzzerSyncDirectory,
+					Target:   constants.FuzzerOutputDirectory,
 					Source:   syncDirectory,
 					Type:     "bind",
 					ReadOnly: false,
@@ -217,14 +240,17 @@ func CreateFuzzer(target string, stop chan bool) (*FuzzClusterConfiguration, err
 		}
 		if len(stop) > 0 {
 			<-stop
-			err = client.StopContainer(cont.ID, 1)
-			err = client.RemoveContainer(
-				d.RemoveContainerOptions{
-					ID:    cont.ID,
-					Force: true,
-				},
+			var result *multierror.Error
+			multierror.Append(result,
+				client.StopContainer(cont.ID, 1),
+				client.RemoveContainer(
+					d.RemoveContainerOptions{
+						ID:    cont.ID,
+						Force: true,
+					},
+				),
 			)
-			return nil, err
+			return nil, result.ErrorOrNil()
 		}
 	}
 

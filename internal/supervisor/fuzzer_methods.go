@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/everestmz/maxfuzz/internal/constants"
-	"github.com/everestmz/maxfuzz/internal/helpers"
 	"github.com/everestmz/maxfuzz/internal/logging"
 	"github.com/everestmz/maxfuzz/internal/storage"
 
@@ -29,36 +28,11 @@ func commandLogger(command *cmd.Cmd, stop chan bool) {
 	}
 }
 
-func preFuzzCleanup() {
-	// TODO: more reliable cleanup. Consider snapshotting the environment & filesystem,
-	// and then replacing these in between fuzz cycles. If it takes a few mins, it's
-	// definitely worthwhile
-
-	// Remove directories that shouldn't be there but may have been set up by maxfuzz
-	os.RemoveAll("/root/TMP_CLANG")
-	os.RemoveAll(constants.FuzzerBackupLocation)
-
-	// Clear environment variables
-	// Maxfuzz
-	os.Unsetenv("BUILD_FILES")
-	os.Unsetenv("CORPUS")
-	os.Unsetenv("FUZZER_NAME")
-	// Sanitizers
-	os.Unsetenv("AFL_USE_ASAN")
-	os.Unsetenv("ASAN_OPTIONS")
-	os.Unsetenv("ASAN_SYMBOLIZER_PATH")
-	// AFL
-	os.Unsetenv("AFL_FUZZ")
-	os.Unsetenv("AFL_BINARY")
-	os.Unsetenv("AFL_MEMORY_LIMIT")
-	os.Unsetenv("AFL_OPTIONS")
-	// C/C++
-	os.Unsetenv("LD_PRELOAD")
-}
-
 func initialFuzzerSetup(target string, l logging.Logger, h storage.StorageHandler) (string, error) {
 	targetDir := filepath.Join(constants.LocalTargetDirectory, target)
 	syncDir := filepath.Join(constants.LocalSyncDirectory, target)
+
+	//TODO: delete old targetdir
 
 	// Download and uncompress fuzzer context
 	compressedTarget, err := h.GetTarget()
@@ -115,14 +89,22 @@ func initialFuzzerSetup(target string, l logging.Logger, h storage.StorageHandle
 	return "-i /root/fuzz_in -o /root/fuzz_out", nil
 }
 
-func setupAFLCmd() *cmd.Cmd {
-	var command *cmd.Cmd
-	aflBinary := helpers.GetenvOrDie("AFL_FUZZ")
-	aflIoOptions := helpers.GetenvOrDie("AFL_IO_OPTIONS")
-	aflMemoryLimit := helpers.GetenvOrDie("AFL_MEMORY_LIMIT")
+func setupAFLCmd(env map[string]string, aflIoOptions string) ([]string, error) {
+	toReturn := []string{}
+	aflBinary, ok := env["AFL_FUZZ"]
+	if !ok {
+		return toReturn, fmt.Errorf("AFL_FUZZ not populated in environment")
+	}
+	aflMemoryLimit, ok := env["AFL_MEMORY_LIMIT"]
+	if !ok {
+		return toReturn, fmt.Errorf("AFL_MEMORY_LIMIT not populated in environment")
+	}
 	// For now, not used TODO: enable afl extra options
-	_ = helpers.Getenv("AFL_OPTIONS", "") //These can be empty
-	aflBinaryLocation := helpers.GetenvOrDie("AFL_BINARY")
+	_, ok = env["AFL_OPTIONS"] //These can be empty
+	aflBinaryLocation, ok := env["AFL_BINARY"]
+	if !ok {
+		return toReturn, fmt.Errorf("AFL_BINARY not populated in environment")
+	}
 	aflIoOptionsSplit := strings.Split(aflIoOptions, " ")
 
 	if len(aflIoOptionsSplit) == 4 {
@@ -130,19 +112,17 @@ func setupAFLCmd() *cmd.Cmd {
 		inDir := aflIoOptionsSplit[1]
 		syncDir := aflIoOptionsSplit[3]
 
-		command = cmd.NewCmdOptions(
-			aflCmdOptions, aflBinary, "-i", inDir, "-o",
-			syncDir, "-m", aflMemoryLimit, "--", aflBinaryLocation)
+		return []string{aflBinary, "-i", inDir, "-o",
+			syncDir, "-m", aflMemoryLimit, "--", aflBinaryLocation}, nil
 	} else if len(aflIoOptionsSplit) == 3 {
 		// Restarting from backup, only need sync dir
 		syncDir := aflIoOptionsSplit[2]
 
-		command = cmd.NewCmdOptions(
-			aflCmdOptions, aflBinary, "-i-", "-o", syncDir,
-			"-m", aflMemoryLimit, "--", aflBinaryLocation)
+		return []string{aflBinary, "-i-", "-o", syncDir,
+			"-m", aflMemoryLimit, "--", aflBinaryLocation}, nil
 	}
 
-	return command
+	return nil, fmt.Errorf("Weird AFL_IO_OPTIONS length - is this configured right?")
 }
 
 // func runCommandWithLogging(c *cmd.Cmd) error {

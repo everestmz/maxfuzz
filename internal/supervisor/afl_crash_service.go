@@ -41,8 +41,8 @@ func (s AFLCrashService) Serve() {
 	}
 
 	watchDirectories := []string{
-		filepath.Join(constants.FuzzerOutputDirectory, "crashes"),
-		filepath.Join(constants.FuzzerOutputDirectory, "hangs"),
+		filepath.Join(constants.LocalSyncDirectory, s.target, "crashes"),
+		filepath.Join(constants.LocalSyncDirectory, s.target, "hangs"),
 	}
 
 	watcher, err := fsnotify.NewWatcher()

@@ -82,6 +82,7 @@ func fuzz() {
 			currentTarget = nextTarget()
 			fuzzerSupervisor = supervisor.New(logging.NewFuzzerLogger(currentTarget), currentTarget)
 
+			// TODO: Language mapping
 			fuzzer := supervisor.NewCFuzzer(currentTarget)
 			fuzzerSupervisor.Add(fuzzer)
 			fuzzerSupervisor.ServeBackground()

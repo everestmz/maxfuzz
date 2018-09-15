@@ -26,7 +26,7 @@ func (h LocalStorageHandler) BackupExists() (bool, error) {
 	result, err := afero.Exists(
 		fs,
 		filepath.Join(
-			constants.LocalSyncDirectory, h.targetName, "backup.zip",
+			constants.LocalCrashStorage, h.targetName, "backup.zip",
 		),
 	)
 	if err != nil {
@@ -40,7 +40,7 @@ func (h LocalStorageHandler) filesystemSync(source, destination string) error {
 	if err != nil {
 		return fmt.Errorf("File existence check fail: %s", err.Error())
 	}
-	destination = filepath.Join(constants.LocalSyncDirectory, destination)
+	destination = filepath.Join(constants.LocalCrashStorage, destination)
 	err = os.MkdirAll(filepath.Dir(destination), 0744)
 	if err != nil {
 		return fmt.Errorf("Cannot make directory: %s", err.Error())
@@ -80,7 +80,7 @@ func (h LocalStorageHandler) filesystemDownload(source, destination string) erro
 
 func (h LocalStorageHandler) GetBackup() (string, error) {
 	backupLocation := filepath.Join(
-		constants.LocalSyncDirectory, h.targetName, "backup.zip",
+		constants.LocalCrashStorage, h.targetName, "backup.zip",
 	)
 
 	err := h.filesystemDownload(backupLocation, constants.FuzzerBackupLocation)
