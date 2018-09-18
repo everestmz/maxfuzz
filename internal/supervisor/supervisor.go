@@ -32,19 +32,25 @@ func New(l logging.Logger, name string) *suture.Supervisor {
 // Log Writers
 // TODO: some way of splitting logs so these ones are saved elsewhere (container vs maxfuzz logs)
 type stderrWriter struct {
-	containerID string
+	containerID    string
+	suppressOutput bool
 }
 
 func (w stderrWriter) Write(p []byte) (int, error) {
-	log.Print(fmt.Sprintf("[stderr]: %s", p))
+	if !w.suppressOutput {
+		log.Print(fmt.Sprintf("[stderr]: %s", p))
+	}
 	return len(p), nil
 }
 
 type stdoutWriter struct {
-	containerID string
+	containerID    string
+	suppressOutput bool
 }
 
 func (w stdoutWriter) Write(p []byte) (int, error) {
-	log.Print(fmt.Sprintf("[stdout]: %s", p))
+	if !w.suppressOutput {
+		log.Print(fmt.Sprintf("[stdout]: %s", p))
+	}
 	return len(p), nil
 }

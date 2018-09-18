@@ -74,7 +74,7 @@ func (s AFLCrashService) Serve() {
 				s.logger.Info(fmt.Sprintf("Bug found: %s", crashID))
 				err = storageHandler.SavePayload(ev.Name)
 				if err != nil {
-					s.logger.Error(fmt.Sprintf("AFLCrashService Could not save crash file: %s", err.Error()))
+					s.logger.Error(fmt.Sprintf("AFLCrashService Could not save bug payload: %s", err.Error()))
 				}
 			}
 		case err := <-watcher.Error:

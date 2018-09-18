@@ -13,8 +13,8 @@ type StorageHandler interface {
 	GetBackup() (string, error)
 	MakeBackup() error
 	SavePayload(string) error
-	SaveStdout(string) error
-	SaveStderr(string) error
+	SaveOutput(string) error
+	GetTargetBackupLocation() string
 }
 
 var soln StorageHandler

@@ -78,18 +78,25 @@ func (h LocalStorageHandler) filesystemDownload(source, destination string) erro
 	return fmt.Errorf("File %s does not exist", source)
 }
 
+func (h LocalStorageHandler) GetTargetBackupLocation() string {
+	return filepath.Join(constants.LocalSyncDirectory, h.targetName, "backup.zip")
+}
+
 func (h LocalStorageHandler) GetBackup() (string, error) {
 	backupLocation := filepath.Join(
 		constants.LocalCrashStorage, h.targetName, "backup.zip",
 	)
 
-	err := h.filesystemDownload(backupLocation, constants.FuzzerBackupLocation)
-	return constants.FuzzerBackupLocation, err
+	outDir := h.GetTargetBackupLocation()
+	err := h.filesystemDownload(backupLocation, outDir)
+	return outDir, err
 }
 
 func (h LocalStorageHandler) MakeBackup() error {
 	destination := filepath.Join(h.targetName, "backup.zip")
-	err := h.filesystemSync(constants.FuzzerBackupLocation, destination)
+	source := h.GetTargetBackupLocation()
+	err := h.filesystemSync(source, destination)
+	os.Remove(source)
 	return err
 }
 
@@ -99,13 +106,7 @@ func (h LocalStorageHandler) SavePayload(source string) error {
 	return err
 }
 
-func (h LocalStorageHandler) SaveStdout(source string) error {
-	destination := filepath.Join(h.targetName, source)
-	err := h.filesystemSync(source, destination)
-	return err
-}
-
-func (h LocalStorageHandler) SaveStderr(source string) error {
+func (h LocalStorageHandler) SaveOutput(source string) error {
 	destination := filepath.Join(h.targetName, source)
 	err := h.filesystemSync(source, destination)
 	return err

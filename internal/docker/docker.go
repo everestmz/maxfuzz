@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/everestmz/maxfuzz/internal/constants"
 
@@ -71,10 +72,7 @@ func (c *FuzzClusterConfiguration) Deploy(command []string, stdout, stderr io.Wr
 		return nil, err
 	}
 
-	err = followContainer(cont.ID)
-	if err != nil {
-		return nil, err
-	}
+	go followContainerCustomWriters(cont.ID, stdout, stderr)
 
 	return &FuzzCluster{
 		Target:        c.Target,
@@ -105,7 +103,7 @@ func (c *FuzzCluster) State() (*FuzzClusterState, error) {
 
 func (c *FuzzCluster) Kill() error {
 	var result *multierror.Error
-	multierror.Append(result,
+	result = multierror.Append(result,
 		client.StopContainer(c.Fuzzer, 1),
 		client.RemoveContainer(
 			d.RemoveContainerOptions{
@@ -166,8 +164,20 @@ func CreateFuzzer(target string, stop chan bool) (*FuzzClusterConfiguration, err
 	toReturn := &FuzzClusterConfiguration{
 		Target: target,
 	}
+	buildboxName := fmt.Sprintf("%s_buildbox", target)
+	fuzzerName := fmt.Sprintf("%s_fuzzer", target)
+	reproducerName := fmt.Sprintf("%s_reproducer", target)
 
-	//TODO: Make sure all old containers are killed and removed (buildbox, fuzzer, repro)
+	//Make sure all old containers are killed and removed (buildbox, fuzzer, repro)
+	for _, box := range []string{buildboxName, fuzzerName, reproducerName} {
+		client.StopContainer(box, 1)
+		client.RemoveContainer(
+			d.RemoveContainerOptions{
+				ID:    box,
+				Force: true,
+			},
+		)
+	}
 
 	environmentFile, err := os.Open(filepath.Join(constants.LocalTargetDirectory, target, "environment"))
 	if err != nil {
@@ -195,7 +205,7 @@ func CreateFuzzer(target string, stop chan bool) (*FuzzClusterConfiguration, err
 		Env:          environment,
 	}
 	createContainerOptions := d.CreateContainerOptions{
-		Name:   fmt.Sprintf("%s_buildbox", target),
+		Name:   buildboxName,
 		Config: &configuration,
 		HostConfig: &d.HostConfig{
 			Mounts: []d.HostMount{
@@ -233,27 +243,31 @@ func CreateFuzzer(target string, stop chan bool) (*FuzzClusterConfiguration, err
 		return nil, err
 	}
 
+	ticker := time.NewTicker(time.Second)
 	for cont.State.Running {
-		cont, err = client.InspectContainer(cont.ID)
-		if err != nil {
-			return nil, err
-		}
-		if len(stop) > 0 {
-			<-stop
+		select {
+		case <-stop:
 			var result *multierror.Error
-			multierror.Append(result,
-				client.StopContainer(cont.ID, 1),
+			result = multierror.Append(result,
+				fmt.Errorf("Fuzzer creation stopped"),
+				client.StopContainer(buildboxName, 1),
 				client.RemoveContainer(
 					d.RemoveContainerOptions{
-						ID:    cont.ID,
+						ID:    buildboxName,
 						Force: true,
 					},
 				),
 			)
 			return nil, result.ErrorOrNil()
+		case <-ticker.C:
+			cont, err = client.InspectContainer(cont.ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
+	ticker.Stop()
 	if cont.State.Status != "FINISHED" && cont.State.ExitCode != 0 {
 		return nil, fmt.Errorf("Error running build files - please check logs")
 	}

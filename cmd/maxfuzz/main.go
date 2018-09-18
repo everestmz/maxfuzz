@@ -100,6 +100,7 @@ func unregisterTarget(c *gin.Context) {
 }
 
 func main() {
+	// TODO: add command line params for specifying directories
 	targetsLock = sync.RWMutex{}
 	targets = map[string]*Target{}
 	targetsTimer = map[string]int64{}

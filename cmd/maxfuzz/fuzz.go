@@ -18,7 +18,7 @@ var log = &logrus.Logger{
 	Level:     logrus.DebugLevel,
 }
 var currentTarget string
-var fuzzInterval = 3600
+var fuzzInterval = 7200 //seconds
 var stopChan chan bool
 
 func nextTarget() string {
@@ -65,6 +65,8 @@ func logMessage(msg string) *logrus.Entry {
 }
 
 func fuzz() {
+	var timer *time.Timer
+	var skipFuzzerStartup = false
 	stopChan = make(chan bool)
 	logMessage("Waiting for targets...").Info()
 
@@ -76,25 +78,32 @@ func fuzz() {
 		case 0:
 			time.Sleep(time.Second)
 		default:
-			// Get "next" target from list, set next to new one, set supervisor to fuzz target
-			// TODO: don't restart the fuzzer if we don't have any other ones to pick from
-			logMessage(fmt.Sprintf("Fuzzer target status: %+v", targetsTimer)).Info()
-			currentTarget = nextTarget()
-			fuzzerSupervisor = supervisor.New(logging.NewFuzzerLogger(currentTarget), currentTarget)
+			if !skipFuzzerStartup {
+				// Get "next" target from list, set next to new one, set supervisor to fuzz target
+				logMessage(fmt.Sprintf("Fuzzer target status: %+v", targetsTimer)).Info()
+				currentTarget = nextTarget()
+				fuzzerSupervisor = supervisor.New(logging.NewFuzzerLogger(currentTarget), currentTarget)
 
-			// TODO: Language mapping
-			fuzzer := supervisor.NewCFuzzer(currentTarget)
-			fuzzerSupervisor.Add(fuzzer)
-			fuzzerSupervisor.ServeBackground()
+				// TODO: Language mapping
+				fuzzer := supervisor.NewCFuzzer(currentTarget)
+				fuzzerSupervisor.Add(fuzzer)
+				fuzzerSupervisor.ServeBackground()
 
-			logMessage(fmt.Sprintf("Fuzzing new target: %s...", currentTarget)).Info()
-			timer := time.NewTimer(time.Duration(fuzzInterval) * time.Second)
+				logMessage(fmt.Sprintf("Fuzzing new target: %s...", currentTarget)).Info()
+				timer = time.NewTimer(time.Duration(fuzzInterval) * time.Second)
+			}
+			skipFuzzerStartup = false
 			select {
 			case _ = <-timer.C:
-				logMessage(fmt.Sprintf("Cycle for target %s finished. Picking new target...", currentTarget)).Info()
 				targetsLock.Lock()
 				targetsTimer[currentTarget] = time.Now().Unix()
 				targetsLock.Unlock()
+				if nextTarget() == currentTarget {
+					timer = time.NewTimer(time.Duration(fuzzInterval) * time.Second)
+					skipFuzzerStartup = true
+					continue
+				}
+				logMessage(fmt.Sprintf("Cycle for target %s finished. Picking new target...", currentTarget)).Info()
 			case _ = <-stopChan:
 				logMessage(fmt.Sprintf("Target %s removed. Picking new target...", currentTarget)).Info()
 			}

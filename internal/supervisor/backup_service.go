@@ -38,14 +38,16 @@ func (s BackupService) Serve() {
 		s.logger.Error(fmt.Sprintf("Could not initialize storage client:\n%s", err.Error()))
 		return
 	}
+
+	ticker := time.NewTicker(time.Duration(10) * time.Minute)
 	for {
-		timer := time.NewTimer(time.Duration(10) * time.Minute)
 		select {
 		case <-s.stop:
+			ticker.Stop()
 			return
-		case <-timer.C:
-			outFilePath := constants.FuzzerBackupLocation
-			files, err := filepath.Glob(filepath.Join(constants.FuzzerOutputDirectory, "*"))
+		case <-ticker.C:
+			outFilePath := storageHandler.GetTargetBackupLocation()
+			files, err := filepath.Glob(filepath.Join(constants.LocalSyncDirectory, s.target, "*"))
 			if err != nil {
 				s.logger.Error(err.Error())
 				return
@@ -55,8 +57,12 @@ func (s BackupService) Serve() {
 				s.logger.Error(fmt.Sprintf("Could not compress output for backup:\n%s", err.Error()))
 				return
 			}
-			storageHandler.MakeBackup()
+			err = storageHandler.MakeBackup()
+			if err != nil {
+				s.logger.Error(fmt.Sprintf("Could not make backup:\n%s", err.Error()))
+				return
+			}
+			s.logger.Info("BackupService backup successful")
 		}
-
 	}
 }

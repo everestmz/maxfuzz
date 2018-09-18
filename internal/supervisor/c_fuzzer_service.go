@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/everestmz/maxfuzz/internal/constants"
 	"github.com/everestmz/maxfuzz/internal/docker"
@@ -43,6 +44,7 @@ func NewCFuzzer(target string) *suture.Supervisor {
 func (s CFuzzerService) Stop() {
 	s.logger.Info(fmt.Sprintf("CFuzzerService stopping"))
 	s.stop <- true
+	s.logger.Info(fmt.Sprintf("CFuzzerService stopped"))
 }
 
 func (s CFuzzerService) Serve() {
@@ -86,11 +88,14 @@ func (s CFuzzerService) Serve() {
 	}
 
 	opts := helpers.MaxfuzzOptions()
-	if opts["suppressFuzzerOutput"] != "1" {
-		//TODO: ensure that we can suppress this output
+	suppress := opts["suppressFuzzerOutput"] == "1"
+	stdout := stdoutWriter{
+		suppressOutput: suppress,
 	}
-
-	fuzzCluster, err := config.Deploy(command, stdoutWriter{}, stderrWriter{})
+	stderr := stderrWriter{
+		suppressOutput: suppress,
+	}
+	fuzzCluster, err := config.Deploy(command, stdout, stderr)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("CFuzzerService could not start the fuzzer: %s", err.Error()))
 		return
@@ -102,27 +107,30 @@ func (s CFuzzerService) Serve() {
 		return
 	}
 
-	for clusterState.Running() {
-		clusterState, err = fuzzCluster.State()
-		if err != nil {
-			s.logger.Error(fmt.Sprintf("CFuzzerService could not start the fuzzer: %s", err.Error()))
-			return
-		}
-
-		// TODO: Work out why fuzzer doesn't spin down on stop
-		if len(s.stop) > 0 {
-			<-s.stop
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-s.stop:
 			s.logger.Info(fmt.Sprintf("CFuzzerService spinning down fuzzer"))
+			ticker.Stop()
 			err = fuzzCluster.Kill()
 			if err != nil {
 				s.logger.Error(fmt.Sprintf("CFuzzerService could not spin down the fuzzer: %s", err.Error()))
 			}
 			return
+		case <-ticker.C:
+			clusterState, err = fuzzCluster.State()
+			if err != nil {
+				s.logger.Error(fmt.Sprintf("CFuzzerService could not start the fuzzer: %s", err.Error()))
+				return
+			}
+			if !clusterState.Running() {
+				s.logger.Error(
+					fmt.Sprintf(
+						"CFuzzerService fuzz cluster stopped unexpectedly\nErrors: %s\nExit code: %v",
+						err.Error(), clusterState.ExitCode()))
+				return
+			}
 		}
 	}
-
-	s.logger.Error(
-		fmt.Sprintf(
-			"CFuzzerService fuzz cluster stopped unexpectedly\nErrors: %s\nExit code: %s",
-			err.Error(), clusterState.ExitCode()))
 }

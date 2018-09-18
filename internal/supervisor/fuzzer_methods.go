@@ -32,7 +32,9 @@ func initialFuzzerSetup(target string, l logging.Logger, h storage.StorageHandle
 	targetDir := filepath.Join(constants.LocalTargetDirectory, target)
 	syncDir := filepath.Join(constants.LocalSyncDirectory, target)
 
-	//TODO: delete old targetdir
+	// Cleanup old stuff
+	os.RemoveAll(targetDir)
+	os.RemoveAll(syncDir)
 
 	// Download and uncompress fuzzer context
 	compressedTarget, err := h.GetTarget()
