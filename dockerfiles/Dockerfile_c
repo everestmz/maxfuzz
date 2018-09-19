@@ -73,6 +73,18 @@ ENV AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES="1"
 RUN mkdir ~/fuzz_out
 RUN mkdir ~/fuzz_in
 
+###########################
+# ASAN & Symbolizer Setup #
+###########################
+
+RUN mkdir -p /root/TMP_CLANG
+RUN cd /root/TMP_CLANG
+RUN git clone https://chromium.googlesource.com/chromium/src/tools/clang
+RUN cd ..
+RUN TMP_CLANG/clang/scripts/update.py
+RUN cd /root
+RUN rm -rf /root/TMP_CLANG
+
 ###############
 # FINAL SETUP #
 ###############

@@ -78,7 +78,7 @@ func (s AFLCrashService) Serve() {
 				}
 			}
 		case err := <-watcher.Error:
-			s.logger.Error(err.Error())
+			s.logger.Error(fmt.Sprintf("AFLCrashService: %s", err.Error()))
 		case <-s.stop:
 			return
 		}

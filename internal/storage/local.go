@@ -107,7 +107,7 @@ func (h LocalStorageHandler) SavePayload(source string) error {
 }
 
 func (h LocalStorageHandler) SaveOutput(source string) error {
-	destination := filepath.Join(h.targetName, source)
+	destination := filepath.Join(h.targetName, filepath.Base(source))
 	err := h.filesystemSync(source, destination)
 	return err
 }

@@ -1,0 +1,32 @@
+FROM golang:1.11-stretch
+
+MAINTAINER Everest Munro-Zeisberger
+
+WORKDIR /root
+
+########################
+# SETUP ENV & VERSIONS #
+########################
+
+# Environment Variables:
+ENV GOPATH=/root/go/
+ENV GOBIN=/root/go/bin
+ENV PATH=/usr/local/go/bin:$GOBIN:$PATH
+
+################
+# INSTALL DEPS #
+################
+
+RUN apt-get update
+RUN apt-get install -y git
+
+##############################
+# Gofuzz Compilation & Setup #
+##############################
+
+RUN go get -u github.com/dvyukov/go-fuzz/...
+
+# File structure setup
+RUN mkdir ~/fuzz_out
+RUN mkdir ~/fuzz_in
+RUN mkdir -p /root/go/src /root/go/bin

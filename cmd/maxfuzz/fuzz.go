@@ -5,6 +5,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/thejerf/suture"
+
 	"github.com/everestmz/maxfuzz/internal/logging"
 	"github.com/everestmz/maxfuzz/internal/supervisor"
 
@@ -20,6 +22,11 @@ var log = &logrus.Logger{
 var currentTarget string
 var fuzzInterval = 7200 //seconds
 var stopChan chan bool
+var fuzzServices = map[string]func(string) *suture.Supervisor{
+	"c":   supervisor.NewCFuzzer,
+	"c++": supervisor.NewCFuzzer,
+	"go":  supervisor.NewGoFuzzer,
+}
 
 func nextTarget() string {
 	if len(targets) == 0 {
@@ -82,10 +89,15 @@ func fuzz() {
 				// Get "next" target from list, set next to new one, set supervisor to fuzz target
 				logMessage(fmt.Sprintf("Fuzzer target status: %+v", targetsTimer)).Info()
 				currentTarget = nextTarget()
-				fuzzerSupervisor = supervisor.New(logging.NewFuzzerLogger(currentTarget), currentTarget)
 
-				// TODO: Language mapping
-				fuzzer := supervisor.NewCFuzzer(currentTarget)
+				t := targets[currentTarget]
+				newFuzzService, ok := fuzzServices[t.Language]
+				if !ok {
+					logMessage(fmt.Sprintf("Invalid language %s for target %s", t.Language, t.ID)).Info()
+					continue
+				}
+				fuzzer := newFuzzService(currentTarget)
+				fuzzerSupervisor = supervisor.New(logging.NewFuzzerLogger(currentTarget), currentTarget)
 				fuzzerSupervisor.Add(fuzzer)
 				fuzzerSupervisor.ServeBackground()
 

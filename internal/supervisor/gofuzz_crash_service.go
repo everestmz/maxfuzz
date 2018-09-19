@@ -43,14 +43,14 @@ func (s GofuzzCrashService) Serve() {
 		return
 	}
 
-	err = watcher.Watch(filepath.Join(constants.FuzzerOutputDirectory, "crashers"))
-	panicOnError(err)
-
 	s.logger.Info("GofuzzCrashService waiting for crash directories")
 	exists := false
 	for !exists {
 		exists = helpers.Exists(filepath.Join(constants.FuzzerOutputDirectory, "crashers"))
 	}
+
+	err = watcher.Watch(filepath.Join(constants.FuzzerOutputDirectory, "crashers"))
+	panicOnError(err)
 
 	for {
 		select {
@@ -76,7 +76,7 @@ func (s GofuzzCrashService) Serve() {
 				}
 			}
 		case err := <-watcher.Error:
-			s.logger.Error(err.Error())
+			s.logger.Error(fmt.Sprintf("GofuzzCrashService: %s", err.Error()))
 		case <-s.stop:
 			return
 		}

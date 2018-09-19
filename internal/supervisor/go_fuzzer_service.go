@@ -29,7 +29,7 @@ func NewGoFuzzer(target string) *suture.Supervisor {
 	ret.Add(NewBackupService(target, log))
 	ret.Add(NewGofuzzCrashService(target, log))
 	ret.Add(GoFuzzerService{
-		log, target, make(chan bool), "maxfuzz_go",
+		log, target, make(chan bool), "fuzzbox_go",
 	})
 	return ret
 }

@@ -49,17 +49,17 @@ func (s BackupService) Serve() {
 			outFilePath := storageHandler.GetTargetBackupLocation()
 			files, err := filepath.Glob(filepath.Join(constants.LocalSyncDirectory, s.target, "*"))
 			if err != nil {
-				s.logger.Error(err.Error())
+				s.logger.Error(fmt.Sprintf("BackupService %s", err.Error()))
 				return
 			}
 			err = archiver.Zip.Make(outFilePath, files)
 			if err != nil {
-				s.logger.Error(fmt.Sprintf("Could not compress output for backup:\n%s", err.Error()))
+				s.logger.Error(fmt.Sprintf("BackupService could not compress output for backup:\n%s", err.Error()))
 				return
 			}
 			err = storageHandler.MakeBackup()
 			if err != nil {
-				s.logger.Error(fmt.Sprintf("Could not make backup:\n%s", err.Error()))
+				s.logger.Error(fmt.Sprintf("BackupService could not make backup:\n%s", err.Error()))
 				return
 			}
 			s.logger.Info("BackupService backup successful")

@@ -24,7 +24,7 @@ teardown:
 	docker-compose down
 
 deploy: all
-	MAXFUZZ_OPTIONS=storageSolution=local:suppressFuzzerOutput=1 ./bin/maxfuzz
+	MAXFUZZ_OPTIONS=storageSolution=local:suppressFuzzerOutput=0 ./bin/maxfuzz
 # CLI stuff
 
 tools: build-tools install-tools

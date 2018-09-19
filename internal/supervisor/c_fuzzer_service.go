@@ -38,7 +38,7 @@ func NewCFuzzer(target string) *suture.Supervisor {
 		logging.NewTargetLogger(target),
 		target,
 		make(chan bool),
-		"fuzzbuzz/fuzzbox_c",
+		"fuzzbox_c",
 	})
 	return ret
 }
