@@ -160,7 +160,7 @@ func targetToRepository(target string) string {
 	return fmt.Sprintf("%s_images", target)
 }
 
-func CreateFuzzer(target string, stop chan bool) (*FuzzClusterConfiguration, error) {
+func CreateFuzzer(target, baseImage string, stop chan bool) (*FuzzClusterConfiguration, error) {
 	toReturn := &FuzzClusterConfiguration{
 		Target: target,
 	}
@@ -198,7 +198,7 @@ func CreateFuzzer(target string, stop chan bool) (*FuzzClusterConfiguration, err
 	}
 
 	configuration := d.Config{
-		Image:        "maxfuzz",
+		Image:        baseImage,
 		AttachStdin:  true,
 		AttachStdout: true,
 		Entrypoint:   []string{constants.FuzzerBuildSteps},

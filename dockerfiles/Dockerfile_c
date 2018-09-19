@@ -1,0 +1,82 @@
+FROM ubuntu:trusty@sha256:ed49036f63459d6e5ed6c0f238f5e94c3a0c70d24727c793c48fded60f70aa96
+
+MAINTAINER Everest Munro-Zeisberger
+
+WORKDIR /root
+
+########################
+# SETUP ENV & VERSIONS #
+########################
+
+# Versions:
+ENV AFL_VERSION 2.52b
+
+################
+# INSTALL DEPS #
+################
+
+RUN apt-get update
+RUN apt-get install -y software-properties-common
+RUN apt-get update --fix-missing
+RUN apt-get install -y git
+RUN apt-get install -y wget
+RUN apt-get install -y gcc
+RUN apt-get install -y autoconf
+RUN apt-get install -y make
+RUN apt-get install -y bison
+RUN apt-get install -y libssl-dev
+RUN apt-get install -y libreadline-dev
+RUN apt-get install -y zlib1g-dev
+RUN apt-get install -y pkg-config
+RUN apt-get install -y gcc
+RUN apt-get install -y clang
+RUN apt-get install -y llvm
+RUN apt-get install -y cmake
+RUN apt-get install -y gdb
+RUN apt-get install -y build-essential
+RUN apt-get install -y libgtk2.0-dev
+RUN apt-get install -y libtbb-dev
+RUN apt-get install -y libjasper-dev
+RUN apt-get install -y libjpeg-dev
+RUN apt-get install -y libpng-dev
+RUN apt-get install -y libtiff-dev
+RUN apt-get install -y libavcodec-dev
+RUN apt-get install -y libavutil-dev
+RUN apt-get install -y libavformat-dev
+RUN apt-get install -y libswscale-dev
+RUN apt-get install -y libdc1394-22-dev
+RUN apt-get install -y libv4l-dev
+
+###########################
+# AFL Compilation & Setup #
+###########################
+
+# Download AFL and uncompress
+RUN wget http://lcamtuf.coredump.cx/afl/releases/afl-$AFL_VERSION.tgz
+RUN tar -xvf afl-$AFL_VERSION.tgz
+RUN rm afl-$AFL_VERSION.tgz
+RUN mv afl-$AFL_VERSION afl
+
+# Inject our own AFL config header file
+RUN rm /root/afl/config.h
+COPY ./config/afl_config/config.h /root/afl/config.h
+
+# Compile both standard gcc, clang etc as well as afl-clang-fast, used for
+# faster & persistent test harnesses. Also build the afl-fuzz binary
+RUN cd ~/afl && make
+RUN cd ~/afl/llvm_mode && make
+
+# Environment Setup
+ENV AFL_I_DONT_CARE_ABOUT_MISSING_CRASHES="1"
+
+# File structure setup
+RUN mkdir ~/fuzz_out
+RUN mkdir ~/fuzz_in
+
+###############
+# FINAL SETUP #
+###############
+
+# Move everything to bins
+RUN mv /root/afl /usr/local/bin/afl
+RUN rm -rf /root/afl

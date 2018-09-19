@@ -18,9 +18,10 @@ import (
 )
 
 type CFuzzerService struct {
-	logger   logging.Logger
-	targetID string
-	stop     chan bool
+	logger    logging.Logger
+	targetID  string
+	stop      chan bool
+	baseImage string
 }
 
 var aflCmdOptions = cmd.Options{
@@ -37,6 +38,7 @@ func NewCFuzzer(target string) *suture.Supervisor {
 		logging.NewTargetLogger(target),
 		target,
 		make(chan bool),
+		"fuzzbuzz/fuzzbox_c",
 	})
 	return ret
 }
@@ -73,7 +75,7 @@ func (s CFuzzerService) Serve() {
 
 	// Run the build steps
 	s.logger.Info(fmt.Sprintf("CFuzzerService running build steps"))
-	config, err := docker.CreateFuzzer(s.targetID, s.stop)
+	config, err := docker.CreateFuzzer(s.targetID, s.baseImage, s.stop)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("CFuzzerService could not build the fuzzer: %s", err.Error()))
 		return

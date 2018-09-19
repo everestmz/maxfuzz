@@ -34,7 +34,9 @@ func initialFuzzerSetup(target string, l logging.Logger, h storage.StorageHandle
 
 	// Cleanup old stuff
 	os.RemoveAll(targetDir)
+	os.MkdirAll(targetDir, 0775)
 	os.RemoveAll(syncDir)
+	os.MkdirAll(syncDir, 0775)
 
 	// Download and uncompress fuzzer context
 	compressedTarget, err := h.GetTarget()
@@ -63,6 +65,7 @@ func initialFuzzerSetup(target string, l logging.Logger, h storage.StorageHandle
 	}
 	if exists {
 		err = os.Remove(syncDir)
+		os.MkdirAll(syncDir, 0775)
 		if err != nil {
 			l.Error(fmt.Sprintf("Could not remove compressed target: %s", err.Error()))
 			return "", err
@@ -125,6 +128,17 @@ func setupAFLCmd(env map[string]string, aflIoOptions string) ([]string, error) {
 	}
 
 	return nil, fmt.Errorf("Weird AFL_IO_OPTIONS length - is this configured right?")
+}
+
+func setupGofuzzCommand(env map[string]string) ([]string, error) {
+	toReturn := []string{"/root/go/bin/go-fuzz"}
+	goFuzzZip, ok := env["GO_FUZZ_ZIP"]
+	if !ok {
+		return toReturn, fmt.Errorf("GO_FUZZ_ZIP environment variable not populated")
+	}
+
+	toReturn = append(toReturn, fmt.Sprintf("-bin=%s", goFuzzZip), "-workdir=/root/fuzz_out")
+	return toReturn, nil
 }
 
 // func runCommandWithLogging(c *cmd.Cmd) error {
