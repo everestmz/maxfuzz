@@ -1,3 +1,0 @@
-#!/bin/bash
- source /root/fuzzer-files/test-fuzzer/environment
-/root/fuzzer-files/base/start $@

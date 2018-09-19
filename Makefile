@@ -1,26 +1,36 @@
-# Image stuff
+# Maxfuzz
 
-all: build-base deploy-dev
+all: dep clean build
 
-build-base-fresh:
-	docker build -t maxfuzz ./fuzzer-base --no-cache
+dep:
+	dep ensure
 
-build-base:
-	docker build -t maxfuzz ./fuzzer-base
+clean:
+	@rm -rf ./bin
+
+test:
+	@echo "=============="
+	@echo "== UNIT TESTS:"
+	MAXFUZZ_ENV="test" go test ./internal/helpers -v -tags=unit
+	@echo "=============="
+
+build:
+	go build -o ./bin/maxfuzz ./cmd/maxfuzz
+
+install:
+	mv -t ${GOBIN} ./bin/maxfuzz
 
 teardown:
-	docker-compose -f docker-compose-stable.yml down --remove-orphans
-	docker-compose -f docker-compose-dev.yml down --remove-orphans
+	docker-compose down
 
-deploy-stable: teardown
-	SYNC_DIR=$(shell pwd)/sync docker-compose -f docker-compose-stable.yml build
-	SYNC_DIR=$(shell pwd)/sync docker-compose -f docker-compose-stable.yml up
-
-deploy-dev: teardown
-	SYNC_DIR=$(shell pwd)/sync docker-compose -f docker-compose-dev.yml build
-	SYNC_DIR=$(shell pwd)/sync docker-compose -f docker-compose-dev.yml up
-
+deploy: all
+	MAXFUZZ_OPTIONS=storageSolution=local:suppressFuzzerOutput=0 ./bin/maxfuzz
 # CLI stuff
 
-build-cli:
-	go build -o ./bin/maxfuzz ./cmd/maxfuzz
+tools: build-tools install-tools
+
+build-tools:
+	go build -o ./bin/maxfuzz-tools ./cmd/maxfuzz-tools
+
+install-tools:
+	mv ./bin/maxfuzz-tools ${GOBIN}/maxfuzz-tools

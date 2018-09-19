@@ -5,6 +5,11 @@ package templates
 //
 
 var buildStepsPrefix = `
+set -x
+set -e
+
+cd /root/fuzzer
+
 #### Build environment setup
 cp $CORPUS/* /root/fuzz_in/
 cd /root
@@ -18,7 +23,10 @@ cd /root/TMP_CLANG
 git clone https://chromium.googlesource.com/chromium/src/tools/clang
 cd ..
 TMP_CLANG/clang/scripts/update.py
-cd /root
+mv /root/third_party /usr/local/bin/third_party
+rm -rf /root/TMP_CLANG
+rm -rf /root/third_party
+cd /root/fuzzer
 `
 
 //
@@ -26,9 +34,8 @@ cd /root
 //
 
 var environmentPrefix = `
-source /root/fuzzer-files/base/environment
 #### Required for build steps:
-export BUILD_FILES="/root/fuzzer-files/%s"
+export BUILD_FILES="/root/fuzzer"
 
 #### Required for run-time
 export FUZZER_NAME="%s"
@@ -37,18 +44,18 @@ export FUZZER_NAME="%s"
 var environmentAsanBlock = `
 export AFL_USE_ASAN="1"
 export ASAN_OPTIONS="symbolize=0:detect_leaks=0:abort_on_error=1"
-export ASAN_SYMBOLIZER_PATH="/root/third_party/llvm-build/Release+Asserts/bin/llvm-symbolizer"
+export ASAN_SYMBOLIZER_PATH="/usr/local/bin/third_party/llvm-build/Release+Asserts/bin/llvm-symbolizer"
 `
 
 var pythonEnvironmentSettings = `
-export AFL_FUZZ="py-afl-fuzz"
+export AFL_FUZZ="/usr/local/bin/py-afl-fuzz"
 export AFL_BINARY=%s
-export AFL_MEMORY_LIMIT=%s // size in MB or "none"
-export AFL_OPTIONS="%s" // extra command line flags for AFL
+export AFL_MEMORY_LIMIT=%s
+export AFL_OPTIONS="%s"
 `
 
 var genericEnvironmentSettings = `
-export AFL_FUZZ="/root/afl/afl-fuzz"
+export AFL_FUZZ="/usr/local/bin/afl/afl-fuzz"
 export AFL_BINARY=%s
 export AFL_MEMORY_LIMIT=%s
 export AFL_OPTIONS="%s"
@@ -56,18 +63,4 @@ export AFL_OPTIONS="%s"
 
 var goEnvironmentSettings = `
 export GO_FUZZ_ZIP=$BUILD_FILES/%s
-`
-
-//
-// START SNIPPETS
-//
-
-var genericStartScript = `
-source /root/fuzzer-files/%s/environment
-/root/fuzzer-files/base/start $1
-`
-
-var goStartScript = `
-source /root/fuzzer-files/%s/environment
-/root/fuzzer-files/base/start gofuzz
 `

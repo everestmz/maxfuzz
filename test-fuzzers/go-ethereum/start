@@ -1,3 +1,0 @@
-#!/bin/bash
- source /root/fuzzer-files/go-ethereum/environment
-/root/fuzzer-files/base/start gofuzz
