@@ -23,7 +23,9 @@ type GoFuzzerService struct {
 	baseImage string
 }
 
-func NewGoFuzzer(target string) *suture.Supervisor {
+var availableHostPorts map[int]bool
+
+func NewGoFuzzer(target string, stats chan *TargetStats) *suture.Supervisor {
 	log := logging.NewTargetLogger(target)
 	ret := New(log, target)
 	ret.Add(NewBackupService(target, log))

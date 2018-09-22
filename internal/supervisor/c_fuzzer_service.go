@@ -29,10 +29,11 @@ var aflCmdOptions = cmd.Options{
 	Streaming: true,
 }
 
-func NewCFuzzer(target string) *suture.Supervisor {
+func NewCFuzzer(target string, stats chan *TargetStats) *suture.Supervisor {
 	log := logging.NewTargetLogger(target)
 	ret := New(log, target)
 	ret.Add(NewBackupService(target, log))
+	ret.Add(NewAFLStatsService(target, log, stats))
 	ret.Add(NewAFLCrashService(target, log))
 	ret.Add(CFuzzerService{
 		logging.NewTargetLogger(target),

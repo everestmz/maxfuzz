@@ -22,7 +22,8 @@ var log = &logrus.Logger{
 var currentTarget string
 var fuzzInterval = 7200 //seconds
 var stopChan chan bool
-var fuzzServices = map[string]func(string) *suture.Supervisor{
+var statsChan chan *supervisor.TargetStats
+var fuzzServices = map[string]func(string, chan *supervisor.TargetStats) *suture.Supervisor{
 	"c":   supervisor.NewCFuzzer,
 	"c++": supervisor.NewCFuzzer,
 	"go":  supervisor.NewGoFuzzer,
@@ -71,11 +72,25 @@ func logMessage(msg string) *logrus.Entry {
 	)
 }
 
+func watchStats() {
+	for {
+		select {
+		case s := <-statsChan:
+			targetsLock.Lock()
+			targetStats[s.ID] = s
+			targetsLock.Unlock()
+		}
+	}
+}
+
 func fuzz() {
 	var timer *time.Timer
 	var skipFuzzerStartup = false
+	statsChan = make(chan *supervisor.TargetStats)
 	stopChan = make(chan bool)
 	logMessage("Waiting for targets...").Info()
+
+	go watchStats()
 
 	for {
 		targetsLock.RLock()
@@ -96,7 +111,7 @@ func fuzz() {
 					logMessage(fmt.Sprintf("Invalid language %s for target %s", t.Language, t.ID)).Info()
 					continue
 				}
-				fuzzer := newFuzzService(currentTarget)
+				fuzzer := newFuzzService(currentTarget, statsChan)
 				fuzzerSupervisor = supervisor.New(logging.NewFuzzerLogger(currentTarget), currentTarget)
 				fuzzerSupervisor.Add(fuzzer)
 				fuzzerSupervisor.ServeBackground()

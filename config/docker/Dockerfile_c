@@ -78,11 +78,11 @@ RUN mkdir ~/fuzz_in
 ###########################
 
 RUN mkdir -p /root/TMP_CLANG
-RUN cd /root/TMP_CLANG
+WORKDIR /root/TMP_CLANG
 RUN git clone https://chromium.googlesource.com/chromium/src/tools/clang
-RUN cd ..
+WORKDIR /root
 RUN TMP_CLANG/clang/scripts/update.py
-RUN cd /root
+WORKDIR /root
 RUN rm -rf /root/TMP_CLANG
 
 ###############
@@ -92,3 +92,4 @@ RUN rm -rf /root/TMP_CLANG
 # Move everything to bins
 RUN mv /root/afl /usr/local/bin/afl
 RUN rm -rf /root/afl
+WORKDIR /root/fuzzer

@@ -30,3 +30,5 @@ RUN go get -u github.com/dvyukov/go-fuzz/...
 RUN mkdir ~/fuzz_out
 RUN mkdir ~/fuzz_in
 RUN mkdir -p /root/go/src /root/go/bin
+
+WORKDIR /root/fuzzer

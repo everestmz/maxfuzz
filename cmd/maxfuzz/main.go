@@ -20,8 +20,17 @@ type Target struct {
 	Location string `json:"location"`
 }
 
+type Status struct {
+	State          string                    `json:"state"` //FUZZING, IDLE, or ERROR
+	Message        string                    `json:"message"`
+	Targets        []*supervisor.TargetStats `json:"targets"`
+	TestsPerSecond float64                   `json:"tests_per_second"`
+	BugsFound      int                       `json:"bugs_found"`
+}
+
 var targets map[string]*Target
 var targetsTimer map[string]int64
+var targetStats map[string]*supervisor.TargetStats
 var targetsLock sync.RWMutex
 var fuzzerSupervisor *suture.Supervisor
 
@@ -67,6 +76,11 @@ func registerTarget(c *gin.Context) {
 	}
 	targets[t.ID] = t
 	targetsTimer[t.ID] = 0
+	targetStats[t.ID] = &supervisor.TargetStats{
+		ID:             t.ID,
+		TestsPerSecond: 0,
+		BugsFound:      0,
+	}
 	targetsLock.Unlock()
 
 	log.Info("Target registered")
@@ -90,6 +104,7 @@ func unregisterTarget(c *gin.Context) {
 	}
 	delete(targets, t.ID)
 	delete(targetsTimer, t.ID)
+	delete(targetStats, t.ID)
 	targetsLock.Unlock()
 	interruptTarget(t.ID)
 	log.Info("Target unregistered")
@@ -99,11 +114,30 @@ func unregisterTarget(c *gin.Context) {
 	c.JSON(http.StatusOK, t)
 }
 
+func status(c *gin.Context) {
+	status := Status{}
+	if len(targets) > 0 {
+		status.State = "FUZZING"
+	} else {
+		status.State = "IDLE"
+	}
+	targetsLock.RLock()
+	status.Targets = []*supervisor.TargetStats{}
+	for _, t := range targetStats {
+		status.Targets = append(status.Targets, t)
+		status.BugsFound += t.BugsFound
+		status.TestsPerSecond += t.TestsPerSecond
+	}
+	targetsLock.RUnlock()
+	c.JSON(http.StatusOK, status)
+}
+
 func main() {
 	// TODO: add command line params for specifying directories
 	targetsLock = sync.RWMutex{}
 	targets = map[string]*Target{}
 	targetsTimer = map[string]int64{}
+	targetStats = map[string]*supervisor.TargetStats{}
 	err := docker.Init()
 	if err != nil {
 		panic(err)
@@ -116,6 +150,7 @@ func main() {
 
 	router := gin.Default()
 	router.GET("/targets", listTargets)
+	router.GET("/status", status)
 	router.POST("/registerTarget", registerTarget)
 	router.POST("/unregisterTarget", unregisterTarget)
 	router.Run(":8080")

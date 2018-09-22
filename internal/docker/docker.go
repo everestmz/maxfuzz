@@ -29,6 +29,7 @@ type FuzzClusterConfiguration struct {
 	imageID       string //base image with built fuzzer
 	environment   []string
 	syncDirectory string
+	portBindings  map[d.Port][]d.PortBinding
 }
 
 func (c *FuzzClusterConfiguration) Deploy(command []string, stdout, stderr io.Writer) (*FuzzCluster, error) {
@@ -57,7 +58,8 @@ func (c *FuzzClusterConfiguration) Deploy(command []string, stdout, stderr io.Wr
 					ReadOnly: false,
 				},
 			},
-			AutoRemove: true,
+			AutoRemove:   true,
+			PortBindings: c.portBindings,
 		},
 		NetworkingConfig: &d.NetworkingConfig{},
 	}
@@ -160,13 +162,24 @@ func targetToRepository(target string) string {
 	return fmt.Sprintf("%s_images", target)
 }
 
-func CreateFuzzer(target, baseImage string, stop chan bool) (*FuzzClusterConfiguration, error) {
+func CreateFuzzer(target, baseImage string, stop chan bool, exposePorts map[string]string) (*FuzzClusterConfiguration, error) {
 	toReturn := &FuzzClusterConfiguration{
 		Target: target,
 	}
 	buildboxName := fmt.Sprintf("%s_buildbox", target)
 	fuzzerName := fmt.Sprintf("%s_fuzzer", target)
 	reproducerName := fmt.Sprintf("%s_reproducer", target)
+
+	for container, host := range exposePorts {
+		key := d.Port(fmt.Sprintf("%s/tcp", container))
+		val := []d.PortBinding{
+			{
+				HostIP:   "0.0.0.0",
+				HostPort: host,
+			},
+		}
+		toReturn.portBindings[key] = val
+	}
 
 	//Make sure all old containers are killed and removed (buildbox, fuzzer, repro)
 	for _, box := range []string{buildboxName, fuzzerName, reproducerName} {

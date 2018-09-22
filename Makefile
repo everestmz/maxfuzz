@@ -17,6 +17,10 @@ test:
 build:
 	go build -o ./bin/maxfuzz ./cmd/maxfuzz
 
+build-dockerfiles:
+	docker build -f ./config/docker/Dockerfile_c -t fuzzbox_c .
+	docker build -f ./config/docker/Dockerfile_go -t fuzzbox_go .
+
 install:
 	mv -t ${GOBIN} ./bin/maxfuzz
 

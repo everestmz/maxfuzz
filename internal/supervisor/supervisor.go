@@ -29,6 +29,12 @@ func New(l logging.Logger, name string) *suture.Supervisor {
 	return supervisor
 }
 
+type TargetStats struct {
+	ID             string  `json:"id"`
+	TestsPerSecond float64 `json:"tests_per_second"`
+	BugsFound      int     `json:"bugs_found"`
+}
+
 // Log Writers
 // TODO: some way of splitting logs so these ones are saved elsewhere (container vs maxfuzz logs)
 type stderrWriter struct {
