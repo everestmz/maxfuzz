@@ -3,6 +3,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:411b4b8c3f3fa151d7b467a08fd3b8fb1c4524ed60837899f5a1065138e873e0"
+  name = "astuart.co/go-sse"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "b4959b80efe5e2773208bdaa97e5867583ec2c68"
+
+[[projects]]
+  branch = "master"
   digest = "1:6da51e5ec493ad2b44cb04129e2d0a068c8fb9bd6cb5739d199573558696bb94"
   name = "github.com/Azure/go-ansiterm"
   packages = [
@@ -508,13 +516,13 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "astuart.co/go-sse",
     "github.com/adjust/rmq",
     "github.com/aws/aws-sdk-go/aws",
     "github.com/aws/aws-sdk-go/aws/session",
     "github.com/aws/aws-sdk-go/service/s3",
     "github.com/aws/aws-sdk-go/service/s3/s3manager",
     "github.com/fsouza/go-dockerclient",
-    "github.com/gin-contrib/sse",
     "github.com/gin-gonic/gin",
     "github.com/go-cmd/cmd",
     "github.com/hashicorp/go-multierror",

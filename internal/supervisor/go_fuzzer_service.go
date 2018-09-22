@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/everestmz/maxfuzz/internal/constants"
@@ -21,17 +22,49 @@ type GoFuzzerService struct {
 	targetID  string
 	stop      chan bool
 	baseImage string
+	statsPort string
 }
 
 var availableHostPorts map[int]bool
 
+func getAvailablePort() string {
+	if availableHostPorts == nil {
+		availableHostPorts = map[int]bool{}
+	}
+	base := 8090
+	for {
+		available, ok := availableHostPorts[base]
+		if !ok || available {
+			availableHostPorts[base] = false
+			return fmt.Sprintf("%v", base)
+		}
+		base += 1
+	}
+}
+
+func unregisterPort(port string) error {
+	if availableHostPorts == nil {
+		availableHostPorts = map[int]bool{}
+	}
+	var portNum int
+	var err error
+	portNum, err = strconv.Atoi(port)
+	if err != nil {
+		return err
+	}
+	availableHostPorts[portNum] = true
+	return nil
+}
+
 func NewGoFuzzer(target string, stats chan *TargetStats) *suture.Supervisor {
 	log := logging.NewTargetLogger(target)
 	ret := New(log, target)
+	statsPort := getAvailablePort()
 	ret.Add(NewBackupService(target, log))
+	ret.Add(NewGofuzzStatsService(target, statsPort, log, stats))
 	ret.Add(NewGofuzzCrashService(target, log))
 	ret.Add(GoFuzzerService{
-		log, target, make(chan bool), "fuzzbox_go",
+		log, target, make(chan bool), "fuzzbox_go", statsPort,
 	})
 	return ret
 }
@@ -68,7 +101,9 @@ func (s GoFuzzerService) Serve() {
 
 	// Run the build steps
 	s.logger.Info(fmt.Sprintf("GoFuzzerService running build steps"))
-	config, err := docker.CreateFuzzer(s.targetID, s.baseImage, s.stop)
+	config, err := docker.CreateFuzzer(s.targetID, s.baseImage, s.stop, map[string]string{
+		"8000": s.statsPort, // Expose the gofuzz stats port
+	})
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("GoFuzzerService could not build the fuzzer: %s", err.Error()))
 		return

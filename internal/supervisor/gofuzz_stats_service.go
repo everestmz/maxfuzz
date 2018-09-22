@@ -1,32 +1,39 @@
 package supervisor
 
 import (
-	"bufio"
+	"bytes"
+	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
+	"log"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/everestmz/maxfuzz/internal/constants"
+	sse "astuart.co/go-sse"
 	"github.com/everestmz/maxfuzz/internal/logging"
-	"github.com/gin-contrib/sse"
 )
 
-type GofuzzStatsService struct {
-	logger logging.Logger
-	stop   chan bool
-	stats  chan *TargetStats
-	target string
+type GoFuzzStats struct {
+	Crashers int    `json:"Crashers"`
+	Execs    int    `json:"Execs"`
+	Uptime   string `json:"Uptime"`
 }
 
-func NewGofuzzStatsService(target string, l logging.Logger, statsChan chan *TargetStats) GofuzzStatsService {
+type GofuzzStatsService struct {
+	logger    logging.Logger
+	stop      chan bool
+	stats     chan *TargetStats
+	target    string
+	statsPort string
+}
+
+func NewGofuzzStatsService(target, statsPort string, l logging.Logger, statsChan chan *TargetStats) GofuzzStatsService {
 	return GofuzzStatsService{
-		logger: l,
-		stop:   make(chan bool),
-		target: target,
-		stats:  statsChan,
+		logger:    l,
+		stop:      make(chan bool),
+		target:    target,
+		stats:     statsChan,
+		statsPort: statsPort,
 	}
 }
 
@@ -37,62 +44,76 @@ func (s GofuzzStatsService) Stop() {
 
 func (s GofuzzStatsService) Serve() {
 	s.logger.Info("GofuzzStatsService starting")
-	statsFile := filepath.Join(constants.LocalSyncDirectory, s.target, "fuzzer_stats")
 
 	s.logger.Info("GofuzzStatsService waiting for fuzzer to initialize")
 	evCh := make(chan *sse.Event)
-	go sse.Notify("http://localhost:8000/eventsource", evCh)
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			sse.Notify(fmt.Sprintf("http://0.0.0.0:%s/eventsource", s.statsPort), evCh)
+		}
+	}()
 
 	s.logger.Info("GofuzzStatsService watching statistics")
-	ticker := time.NewTicker(time.Minute)
 	for {
 		select {
 		case <-s.stop:
-			ticker.Stop()
 			return
-		case <-ticker.C:
-			statsMap := map[string]string{}
-			file, err := os.Open(statsFile)
+		case evt := <-evCh:
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(evt.Data)
+			str := buf.String()
+			newStats := GoFuzzStats{}
+			err := json.Unmarshal([]byte(str), &newStats)
 			if err != nil {
-				s.logger.Error(fmt.Sprintf("GofuzzStatsService %s", err.Error()))
+				s.logger.Error(fmt.Sprintf("GofuzzStatsService could not parse sse stream: %s", err.Error()))
 				return
 			}
-
-			// This adds lines like "key : val" to statsMap[key] = val
-			scanner := bufio.NewScanner(file)
-			for scanner.Scan() {
-				spl := strings.Split(scanner.Text(), ":")
-				k := strings.TrimSpace(spl[0])
-				v := strings.TrimSpace(spl[1])
-				statsMap[k] = v
+			var secsRunning int
+			if strings.Contains(newStats.Uptime, "h") {
+				hrSplit := strings.Split(newStats.Uptime, "h")
+				hrs, err := strconv.Atoi(hrSplit[0])
+				if err != nil {
+					s.logger.Error(fmt.Sprintf("Could not parse time string %s", newStats.Uptime))
+					return
+				}
+				minSplit := strings.Split(hrSplit[1], "m")
+				mins, err := strconv.Atoi(minSplit[0])
+				if err != nil {
+					s.logger.Error(fmt.Sprintf("Could not parse time string %s", newStats.Uptime))
+					return
+				}
+				secsRunning = hrs*3600 + mins*60
+			} else if strings.Contains(newStats.Uptime, "m") {
+				minSplit := strings.Split(newStats.Uptime, "m")
+				mins, err := strconv.Atoi(minSplit[0])
+				if err != nil {
+					s.logger.Error(fmt.Sprintf("Could not parse time string %s", newStats.Uptime))
+					return
+				}
+				secSplit := strings.Split(minSplit[1], "s")
+				secs, err := strconv.Atoi(secSplit[0])
+				if err != nil {
+					s.logger.Error(fmt.Sprintf("Could not parse time string %s", newStats.Uptime))
+					return
+				}
+				secsRunning = secs + mins*60
+			} else if strings.Contains(newStats.Uptime, "s") {
+				secSplit := strings.Split(newStats.Uptime, "s")
+				secs, err := strconv.Atoi(secSplit[0])
+				if err != nil {
+					s.logger.Error(fmt.Sprintf("Could not parse time string %s", newStats.Uptime))
+					return
+				}
+				secsRunning = secs
 			}
-
-			newStats := TargetStats{}
-			newStats.ID = s.target
-			execsPerSecond, err := strconv.ParseFloat(
-				statsMap["execs_per_sec"],
-				64,
-			)
-			if err != nil {
-				s.logger.Error(fmt.Sprintf("GofuzzStatsService could not parse execs_per_sec: %s", err.Error()))
-				return
+			log.Println(fmt.Sprintf("%v execs, %v secs", newStats.Execs, secsRunning))
+			commonStats := TargetStats{
+				ID:             s.target,
+				BugsFound:      newStats.Crashers,
+				TestsPerSecond: float64(newStats.Execs) / float64(secsRunning),
 			}
-			newStats.TestsPerSecond = execsPerSecond
-			uniqueCrashes, err := strconv.Atoi(statsMap["unique_crashes"])
-			if err != nil {
-				s.logger.Error(fmt.Sprintf("GofuzzStatsService could not parse unique_crashes: %s", err.Error()))
-				return
-			}
-
-			uniqueHangs, err := strconv.Atoi(statsMap["unique_hangs"])
-			if err != nil {
-				s.logger.Error(fmt.Sprintf("GofuzzStatsService could not parse unique_hangs: %s", err.Error()))
-				return
-			}
-			newStats.BugsFound = uniqueCrashes + uniqueHangs
-
-			s.stats <- &newStats
-			file.Close()
+			s.stats <- &commonStats
 		}
 	}
 }

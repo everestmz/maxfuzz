@@ -30,6 +30,7 @@ type FuzzClusterConfiguration struct {
 	environment   []string
 	syncDirectory string
 	portBindings  map[d.Port][]d.PortBinding
+	exposedPorts  map[d.Port]struct{}
 }
 
 func (c *FuzzClusterConfiguration) Deploy(command []string, stdout, stderr io.Writer) (*FuzzCluster, error) {
@@ -39,6 +40,7 @@ func (c *FuzzClusterConfiguration) Deploy(command []string, stdout, stderr io.Wr
 		AttachStdout: true,
 		Entrypoint:   command,
 		Env:          c.environment,
+		ExposedPorts: c.exposedPorts,
 	}
 	createContainerOptions := d.CreateContainerOptions{
 		Name:   fmt.Sprintf("%s_fuzzer", c.Target),
@@ -162,9 +164,13 @@ func targetToRepository(target string) string {
 	return fmt.Sprintf("%s_images", target)
 }
 
+type EmptyStruct struct{}
+
 func CreateFuzzer(target, baseImage string, stop chan bool, exposePorts map[string]string) (*FuzzClusterConfiguration, error) {
 	toReturn := &FuzzClusterConfiguration{
-		Target: target,
+		Target:       target,
+		portBindings: map[d.Port][]d.PortBinding{},
+		exposedPorts: map[d.Port]struct{}{},
 	}
 	buildboxName := fmt.Sprintf("%s_buildbox", target)
 	fuzzerName := fmt.Sprintf("%s_fuzzer", target)
@@ -179,6 +185,7 @@ func CreateFuzzer(target, baseImage string, stop chan bool, exposePorts map[stri
 			},
 		}
 		toReturn.portBindings[key] = val
+		toReturn.exposedPorts[key] = EmptyStruct{}
 	}
 
 	//Make sure all old containers are killed and removed (buildbox, fuzzer, repro)

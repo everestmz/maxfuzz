@@ -76,7 +76,7 @@ func (s CFuzzerService) Serve() {
 
 	// Run the build steps
 	s.logger.Info(fmt.Sprintf("CFuzzerService running build steps"))
-	config, err := docker.CreateFuzzer(s.targetID, s.baseImage, s.stop)
+	config, err := docker.CreateFuzzer(s.targetID, s.baseImage, s.stop, map[string]string{})
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("CFuzzerService could not build the fuzzer: %s", err.Error()))
 		return

@@ -137,7 +137,7 @@ func setupGofuzzCommand(env map[string]string) ([]string, error) {
 		return toReturn, fmt.Errorf("GO_FUZZ_ZIP environment variable not populated")
 	}
 
-	toReturn = append(toReturn, fmt.Sprintf("-bin=%s", goFuzzZip), "-workdir=/root/fuzz_out")
+	toReturn = append(toReturn, fmt.Sprintf("-bin=%s", goFuzzZip), "-workdir=/root/fuzz_out", "-http=0.0.0.0:8000")
 	return toReturn, nil
 }
 
