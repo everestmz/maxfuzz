@@ -139,8 +139,8 @@ func followContainer(id string) error {
 		Stdout:       true,
 		Stderr:       true,
 		Follow:       true,
-		OutputStream: stdoutWriter{},
-		ErrorStream:  stderrWriter{},
+		OutputStream: stdoutWriter{containerID: id},
+		ErrorStream:  stderrWriter{containerID: id},
 	}
 
 	return client.Logs(options)
@@ -166,7 +166,7 @@ func targetToRepository(target string) string {
 
 type EmptyStruct struct{}
 
-func CreateFuzzer(target, baseImage string, stop chan bool, exposePorts map[string]string) (*FuzzClusterConfiguration, error) {
+func CreateFuzzer(target, baseImage string, stop chan bool, exposePorts map[string]string, stdout, stderr io.Writer) (*FuzzClusterConfiguration, error) {
 	toReturn := &FuzzClusterConfiguration{
 		Target:       target,
 		portBindings: map[d.Port][]d.PortBinding{},
@@ -256,7 +256,7 @@ func CreateFuzzer(target, baseImage string, stop chan bool, exposePorts map[stri
 		return nil, err
 	}
 
-	go followContainer(cont.ID)
+	go followContainerCustomWriters(cont.ID, stdout, stderr)
 
 	cont, err = client.InspectContainer(cont.ID)
 	if err != nil {

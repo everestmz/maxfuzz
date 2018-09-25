@@ -75,8 +75,18 @@ func (s CFuzzerService) Serve() {
 	environment := gotenv.Parse(environmentFile)
 
 	// Run the build steps
+	opts := helpers.MaxfuzzOptions()
+	suppress := opts["suppressFuzzerOutput"] == "1"
+	stdout := stdoutWriter{
+		suppressOutput: suppress,
+		target:         s.targetID,
+	}
+	stderr := stderrWriter{
+		suppressOutput: suppress,
+		target:         s.targetID,
+	}
 	s.logger.Info(fmt.Sprintf("CFuzzerService running build steps"))
-	config, err := docker.CreateFuzzer(s.targetID, s.baseImage, s.stop, map[string]string{})
+	config, err := docker.CreateFuzzer(s.targetID, s.baseImage, s.stop, map[string]string{}, stdout, stderr)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("CFuzzerService could not build the fuzzer: %s", err.Error()))
 		return
@@ -90,14 +100,6 @@ func (s CFuzzerService) Serve() {
 		return
 	}
 
-	opts := helpers.MaxfuzzOptions()
-	suppress := opts["suppressFuzzerOutput"] == "1"
-	stdout := stdoutWriter{
-		suppressOutput: suppress,
-	}
-	stderr := stderrWriter{
-		suppressOutput: suppress,
-	}
 	fuzzCluster, err := config.Deploy(command, stdout, stderr)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf("CFuzzerService could not start the fuzzer: %s", err.Error()))

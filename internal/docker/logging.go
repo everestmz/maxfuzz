@@ -14,7 +14,7 @@ type stderrWriter struct {
 }
 
 func (w stderrWriter) Write(p []byte) (int, error) {
-	log.Print(fmt.Sprintf("[stderr]: %s", p))
+	log.Print(fmt.Sprintf("[%s:stderr]: %s", w.containerID, p))
 	return len(p), nil
 }
 
@@ -23,6 +23,6 @@ type stdoutWriter struct {
 }
 
 func (w stdoutWriter) Write(p []byte) (int, error) {
-	log.Print(fmt.Sprintf("[stdout]: %s", p))
+	log.Print(fmt.Sprintf("[%s:stdout]: %s", w.containerID, p))
 	return len(p), nil
 }

@@ -36,28 +36,26 @@ type TargetStats struct {
 }
 
 // Log Writers
-// TODO: some way of splitting logs so these ones are saved elsewhere (container vs maxfuzz logs)
-// TODO: specify which fuzzer stderr/out comes from in logs so we know what we're looking at
 type stderrWriter struct {
-	containerID    string
+	target         string
 	suppressOutput bool
 }
 
 func (w stderrWriter) Write(p []byte) (int, error) {
 	if !w.suppressOutput {
-		log.Print(fmt.Sprintf("[stderr]: %s", p))
+		log.Print(fmt.Sprintf("[%s:stderr]: %s", w.target, p))
 	}
 	return len(p), nil
 }
 
 type stdoutWriter struct {
-	containerID    string
+	target         string
 	suppressOutput bool
 }
 
 func (w stdoutWriter) Write(p []byte) (int, error) {
 	if !w.suppressOutput {
-		log.Print(fmt.Sprintf("[stdout]: %s", p))
+		log.Print(fmt.Sprintf("[%s:stdout]: %s", w.target, p))
 	}
 	return len(p), nil
 }

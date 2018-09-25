@@ -12,7 +12,6 @@ type StorageHandler interface {
 	BackupExists() (bool, error)
 	GetBackup() (string, error)
 	MakeBackup() error
-	// TODO: For save payload/output append timestamp so we dont overwrite on filesystem
 	SavePayload(string) error
 	SaveOutput(string) error
 	GetTargetBackupLocation() string

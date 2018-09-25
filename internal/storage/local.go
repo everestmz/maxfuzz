@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/everestmz/maxfuzz/internal/constants"
 
@@ -101,13 +102,13 @@ func (h LocalStorageHandler) MakeBackup() error {
 }
 
 func (h LocalStorageHandler) SavePayload(source string) error {
-	destination := filepath.Join(h.targetName, filepath.Base(source))
+	destination := filepath.Join(h.targetName, fmt.Sprintf("%v_%s", time.Now().Unix(), filepath.Base(source)))
 	err := h.filesystemSync(source, destination)
 	return err
 }
 
 func (h LocalStorageHandler) SaveOutput(source string) error {
-	destination := filepath.Join(h.targetName, filepath.Base(source))
+	destination := filepath.Join(h.targetName, fmt.Sprintf("%v_%s", time.Now().Unix(), filepath.Base(source)))
 	err := h.filesystemSync(source, destination)
 	return err
 }
