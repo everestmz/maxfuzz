@@ -11,6 +11,7 @@ import (
 	"github.com/everestmz/maxfuzz/internal/helpers"
 	"github.com/everestmz/maxfuzz/internal/logging"
 	"github.com/everestmz/maxfuzz/internal/storage"
+	"github.com/everestmz/maxfuzz/internal/types"
 
 	"github.com/go-cmd/cmd"
 	"github.com/subosito/gotenv"
@@ -18,10 +19,11 @@ import (
 )
 
 type CFuzzerService struct {
-	logger    logging.Logger
-	targetID  string
-	stop      chan bool
-	baseImage string
+	logger     logging.Logger
+	targetID   string
+	targetName string
+	stop       chan bool
+	baseImage  string
 }
 
 var aflCmdOptions = cmd.Options{
@@ -29,15 +31,16 @@ var aflCmdOptions = cmd.Options{
 	Streaming: true,
 }
 
-func NewCFuzzer(target string, stats chan *TargetStats) *suture.Supervisor {
-	log := logging.NewTargetLogger(target)
-	ret := New(log, target)
-	ret.Add(NewBackupService(target, log))
-	ret.Add(NewAFLStatsService(target, log, stats))
-	ret.Add(NewAFLCrashService(target, log))
+func NewCFuzzer(target *types.Target, stats chan *TargetStats) *suture.Supervisor {
+	log := logging.NewTargetLogger(target.Name)
+	ret := New(log, target.Name)
+	ret.Add(NewBackupService(target.UniqueID, log))
+	ret.Add(NewAFLStatsService(target.UniqueID, log, stats))
+	ret.Add(NewAFLCrashService(target.UniqueID, target.Revision, log))
 	ret.Add(CFuzzerService{
-		logging.NewTargetLogger(target),
-		target,
+		log,
+		target.UniqueID,
+		target.Name,
 		make(chan bool),
 		"fuzzbox_c",
 	})
@@ -79,11 +82,11 @@ func (s CFuzzerService) Serve() {
 	suppress := opts["suppressFuzzerOutput"] == "1"
 	stdout := stdoutWriter{
 		suppressOutput: suppress,
-		target:         s.targetID,
+		target:         s.targetName,
 	}
 	stderr := stderrWriter{
 		suppressOutput: suppress,
-		target:         s.targetID,
+		target:         s.targetName,
 	}
 	s.logger.Info(fmt.Sprintf("CFuzzerService running build steps"))
 	config, err := docker.CreateFuzzer(s.targetID, s.baseImage, s.stop, map[string]string{}, stdout, stderr)

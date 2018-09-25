@@ -7,13 +7,24 @@ import (
 	"github.com/everestmz/maxfuzz/internal/logging"
 )
 
+type FuzzerPayload struct {
+	Category string
+	Location string
+	Revision string
+}
+
+type FuzzerPayloadOutput struct {
+	Identifier string
+	Output     []string
+}
+
 type StorageHandler interface {
 	GetTarget() (string, error)
 	BackupExists() (bool, error)
 	GetBackup() (string, error)
 	MakeBackup() error
-	SavePayload(string) error
-	SaveOutput(string) error
+	SavePayload(FuzzerPayload) (string, error)
+	SaveOutput(FuzzerPayloadOutput) error
 	GetTargetBackupLocation() string
 }
 

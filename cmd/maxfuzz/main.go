@@ -6,21 +6,15 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/everestmz/maxfuzz/internal/helpers"
-
 	"github.com/everestmz/maxfuzz/internal/docker"
+	"github.com/everestmz/maxfuzz/internal/helpers"
 	"github.com/everestmz/maxfuzz/internal/logging"
 	"github.com/everestmz/maxfuzz/internal/supervisor"
+	"github.com/everestmz/maxfuzz/internal/types"
 
 	"github.com/gin-gonic/gin"
 	"github.com/thejerf/suture"
 )
-
-type Target struct {
-	ID       string `json:"id"`
-	Language string `json:"language"`
-	Location string `json:"location"`
-}
 
 type Status struct {
 	State          string                    `json:"state"` //FUZZING, IDLE, or ERROR
@@ -30,62 +24,62 @@ type Status struct {
 	BugsFound      int                       `json:"bugs_found"`
 }
 
-var targets map[string]*Target
+var targets map[string]*types.Target
 var targetsTimer map[string]int64
 var targetStats map[string]*supervisor.TargetStats
 var targetsLock sync.RWMutex
 var fuzzerSupervisor *suture.Supervisor
 var fuzzStrategy string // parallel or robin
 
-func addTarget(t *Target) error {
+func addTarget(t *types.Target) error {
 	targetsLock.Lock()
-	_, exists := targets[t.ID]
+	_, exists := targets[t.UniqueID]
 	if exists {
 
 		targetsLock.Unlock()
-		return fmt.Errorf(fmt.Sprintf("Target %s already exists", t.ID))
+		return fmt.Errorf(fmt.Sprintf("Target %s already exists", t.UniqueID))
 	}
-	targets[t.ID] = t
-	targetStats[t.ID] = &supervisor.TargetStats{
-		ID:             t.ID,
+	targets[t.UniqueID] = t
+	targetStats[t.UniqueID] = &supervisor.TargetStats{
+		ID:             t.UniqueID,
 		TestsPerSecond: 0,
 		BugsFound:      0,
 	}
 	if fuzzStrategy == "robin" {
 		// Round Robin fuzzing
-		targetsTimer[t.ID] = 0
+		targetsTimer[t.UniqueID] = 0
 
 	} else {
 		// Parallel fuzzing
-		parallelAddChan <- targets[t.ID]
+		parallelAddChan <- targets[t.UniqueID]
 	}
 	targetsLock.Unlock()
 	return nil
 }
 
-func removeTarget(t *Target) error {
+func removeTarget(t *types.Target) error {
 	targetsLock.Lock()
-	_, exists := targets[t.ID]
+	_, exists := targets[t.UniqueID]
 	if !exists {
 		targetsLock.Unlock()
-		return fmt.Errorf(fmt.Sprintf("Target %s does not exist", t.ID))
+		return fmt.Errorf(fmt.Sprintf("Target %s does not exist", t.UniqueID))
 	}
-	delete(targets, t.ID)
-	delete(targetStats, t.ID)
+	delete(targets, t.UniqueID)
+	delete(targetStats, t.UniqueID)
 	// Round robin fuzzing
 	if fuzzStrategy == "robin" {
-		delete(targetsTimer, t.ID)
+		delete(targetsTimer, t.UniqueID)
 	} else {
 		// Parallel fuzzing
-		stopChan <- t.ID
+		stopChan <- t.UniqueID
 	}
-	interruptTarget(t.ID)
+	interruptTarget(t.UniqueID)
 	targetsLock.Unlock()
 	return nil
 }
 
-func deserializeTarget(c *gin.Context) (*Target, error) {
-	ret := Target{}
+func deserializeTarget(c *gin.Context) (*types.Target, error) {
+	ret := types.Target{}
 	b, err := c.GetRawData()
 	if err != nil {
 		return &ret, err
@@ -99,7 +93,7 @@ func deserializeTarget(c *gin.Context) (*Target, error) {
 
 func listTargets(c *gin.Context) {
 	targetsLock.RLock()
-	targetArray := []*Target{}
+	targetArray := []*types.Target{}
 	for _, v := range targets {
 		targetArray = append(targetArray, v)
 	}
@@ -114,7 +108,7 @@ func registerTarget(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	log := logging.NewTargetLogger(t.ID)
+	log := logging.NewTargetLogger(t.Name)
 	log.Info("Registering target...")
 	err = addTarget(t)
 	if err != nil {
@@ -130,7 +124,7 @@ func unregisterTarget(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	log := logging.NewTargetLogger(t.ID)
+	log := logging.NewTargetLogger(t.Name)
 	log.Info("Unregistering target...")
 	err = removeTarget(t)
 	if err != nil {
@@ -164,7 +158,7 @@ func status(c *gin.Context) {
 func main() {
 	// TODO: add command line params for specifying directories
 	targetsLock = sync.RWMutex{}
-	targets = map[string]*Target{}
+	targets = map[string]*types.Target{}
 	targetsTimer = map[string]int64{}
 	targetStats = map[string]*supervisor.TargetStats{}
 	maxfuzzOptions := helpers.MaxfuzzOptions()

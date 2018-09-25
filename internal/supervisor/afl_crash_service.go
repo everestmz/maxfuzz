@@ -14,16 +14,18 @@ import (
 )
 
 type AFLCrashService struct {
-	logger logging.Logger
-	stop   chan bool
-	target string
+	logger   logging.Logger
+	stop     chan bool
+	target   string
+	revision string
 }
 
-func NewAFLCrashService(target string, l logging.Logger) AFLCrashService {
+func NewAFLCrashService(target, revision string, l logging.Logger) AFLCrashService {
 	return AFLCrashService{
-		logger: l,
-		stop:   make(chan bool),
-		target: target,
+		logger:   l,
+		stop:     make(chan bool),
+		target:   target,
+		revision: revision,
 	}
 }
 
@@ -72,7 +74,14 @@ func (s AFLCrashService) Serve() {
 			if ev.IsCreate() && !strings.Contains(ev.Name, "README.txt") {
 				crashID := filepath.Base(ev.Name)
 				s.logger.Info(fmt.Sprintf("Bug found: %s", crashID))
-				err = storageHandler.SavePayload(ev.Name)
+				// TODO: actually parse the category properly
+				payload := storage.FuzzerPayload{
+					Location: ev.Name,
+					Category: "CRASH",
+					Revision: s.revision,
+				}
+				// TODO: Reproduce the crash and use the unique ID from save to store it
+				_, err = storageHandler.SavePayload(payload)
 				if err != nil {
 					s.logger.Error(fmt.Sprintf("AFLCrashService Could not save bug payload: %s", err.Error()))
 				}

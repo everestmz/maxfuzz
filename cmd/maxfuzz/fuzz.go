@@ -7,6 +7,7 @@ import (
 
 	"github.com/everestmz/maxfuzz/internal/logging"
 	"github.com/everestmz/maxfuzz/internal/supervisor"
+	"github.com/everestmz/maxfuzz/internal/types"
 
 	"github.com/sirupsen/logrus"
 	"github.com/thejerf/suture"
@@ -24,7 +25,7 @@ var log = &logrus.Logger{
 // COMMON VARS
 //
 var statsChan chan *supervisor.TargetStats
-var fuzzServices = map[string]func(string, chan *supervisor.TargetStats) *suture.Supervisor{
+var fuzzServices = map[string]func(*types.Target, chan *supervisor.TargetStats) *suture.Supervisor{
 	"c":   supervisor.NewCFuzzer,
 	"c++": supervisor.NewCFuzzer,
 	"go":  supervisor.NewGoFuzzer,
@@ -74,7 +75,7 @@ func nextTarget() string {
 // PARALLEL FUZZING
 //
 var parallelFuzzers map[string]*suture.Supervisor
-var parallelAddChan chan *Target
+var parallelAddChan chan *types.Target
 
 //
 ///////////////////
@@ -120,7 +121,7 @@ func fuzz() {
 
 func fuzzParallel() {
 	logMessage("Waiting for targets...").Info()
-	parallelAddChan = make(chan *Target)
+	parallelAddChan = make(chan *types.Target)
 	parallelFuzzers = map[string]*suture.Supervisor{}
 
 	for {
@@ -129,15 +130,15 @@ func fuzzParallel() {
 			log.Println(fmt.Sprintf("%+v", *t))
 			newFuzzService, ok := fuzzServices[t.Language]
 			if !ok {
-				logMessage(fmt.Sprintf("Invalid language %s for target %s", t.Language, t.ID)).Info()
+				logMessage(fmt.Sprintf("Invalid language %s for target %s", t.Language, t.Name)).Info()
 				continue
 			}
-			fuzzer := newFuzzService(t.ID, statsChan)
-			fuzzerSupervisor := supervisor.New(logging.NewFuzzerLogger(t.ID), t.ID)
+			fuzzer := newFuzzService(t, statsChan)
+			fuzzerSupervisor := supervisor.New(logging.NewFuzzerLogger(t.Name), t.Name)
 			fuzzerSupervisor.Add(fuzzer)
-			logMessage(fmt.Sprintf("Fuzzing new target %s", t.ID)).Info()
+			logMessage(fmt.Sprintf("Fuzzing new target %s", t.Name)).Info()
 			fuzzerSupervisor.ServeBackground()
-			parallelFuzzers[t.ID] = fuzzerSupervisor
+			parallelFuzzers[t.UniqueID] = fuzzerSupervisor
 		case t := <-stopChan:
 			logMessage(fmt.Sprintf("Killing target %s", t)).Info()
 			sup, ok := parallelFuzzers[t]
@@ -175,10 +176,10 @@ func fuzzRoundRobin() {
 				t := targets[currentTarget]
 				newFuzzService, ok := fuzzServices[t.Language]
 				if !ok {
-					logMessage(fmt.Sprintf("Invalid language %s for target %s", t.Language, t.ID)).Info()
+					logMessage(fmt.Sprintf("Invalid language %s for target %s", t.Language, t.Name)).Info()
 					continue
 				}
-				fuzzer := newFuzzService(currentTarget, statsChan)
+				fuzzer := newFuzzService(targets[currentTarget], statsChan)
 				fuzzerSupervisor = supervisor.New(logging.NewFuzzerLogger(currentTarget), currentTarget)
 				fuzzerSupervisor.Add(fuzzer)
 				fuzzerSupervisor.ServeBackground()

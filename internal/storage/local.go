@@ -101,16 +101,18 @@ func (h LocalStorageHandler) MakeBackup() error {
 	return err
 }
 
-func (h LocalStorageHandler) SavePayload(source string) error {
-	destination := filepath.Join(h.targetName, fmt.Sprintf("%v_%s", time.Now().Unix(), filepath.Base(source)))
-	err := h.filesystemSync(source, destination)
-	return err
+func (h LocalStorageHandler) SavePayload(source FuzzerPayload) (string, error) {
+	payloadID := fmt.Sprintf("%v_%s", time.Now().Unix(), filepath.Base(source.Location))
+	destination := filepath.Join(h.targetName, payloadID)
+	err := h.filesystemSync(source.Location, destination)
+	return payloadID, err
 }
 
-func (h LocalStorageHandler) SaveOutput(source string) error {
-	destination := filepath.Join(h.targetName, fmt.Sprintf("%v_%s", time.Now().Unix(), filepath.Base(source)))
-	err := h.filesystemSync(source, destination)
-	return err
+func (h LocalStorageHandler) SaveOutput(source FuzzerPayloadOutput) error {
+	// TODO: save outputs properly
+	// destination := filepath.Join(h.targetName, fmt.Sprintf("%v_%s", time.Now().Unix(), filepath.Base(source)))
+	// err := h.filesystemSync(source, destination)
+	return nil
 }
 
 func (h LocalStorageHandler) GetTarget() (string, error) {

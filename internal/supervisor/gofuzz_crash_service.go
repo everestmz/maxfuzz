@@ -14,16 +14,18 @@ import (
 )
 
 type GofuzzCrashService struct {
-	logger logging.Logger
-	stop   chan bool
-	target string
+	logger   logging.Logger
+	stop     chan bool
+	target   string
+	revision string
 }
 
-func NewGofuzzCrashService(target string, l logging.Logger) GofuzzCrashService {
+func NewGofuzzCrashService(target, revision string, l logging.Logger) GofuzzCrashService {
 	return GofuzzCrashService{
-		logger: l,
-		stop:   make(chan bool),
-		target: target,
+		logger:   l,
+		stop:     make(chan bool),
+		target:   target,
+		revision: revision,
 	}
 }
 
@@ -59,17 +61,17 @@ func (s GofuzzCrashService) Serve() {
 				s.logger.Info("GoFuzzCrashService: Bug found")
 				if strings.Contains(ev.Name, ".output") {
 					// This is the output of a crash
-					outputID := filepath.Base(ev.Name)
-					s.logger.Info(fmt.Sprintf("But output found: %s", outputID))
-					err = storageHandler.SaveOutput(ev.Name)
-					if err != nil {
-						s.logger.Error(fmt.Sprintf("GofuzzCrashService Could not save bug output: %s", err.Error()))
-					}
+					// TODO: Parse crash output
 				} else {
 					// This is a crash payload
+					payload := storage.FuzzerPayload{
+						Location: ev.Name,
+						Category: "CRASH",
+						Revision: s.revision,
+					}
 					crashID := filepath.Base(ev.Name)
 					s.logger.Info(fmt.Sprintf("Bug found: %s", crashID))
-					err = storageHandler.SavePayload(ev.Name)
+					_, err = storageHandler.SavePayload(payload)
 					if err != nil {
 						s.logger.Error(fmt.Sprintf("GofuzzCrashService Could not save bug payload: %s", err.Error()))
 					}

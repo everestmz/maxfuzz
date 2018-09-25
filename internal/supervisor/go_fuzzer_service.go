@@ -12,17 +12,19 @@ import (
 	"github.com/everestmz/maxfuzz/internal/helpers"
 	"github.com/everestmz/maxfuzz/internal/logging"
 	"github.com/everestmz/maxfuzz/internal/storage"
+	"github.com/everestmz/maxfuzz/internal/types"
 	"github.com/subosito/gotenv"
 
 	"github.com/thejerf/suture"
 )
 
 type GoFuzzerService struct {
-	logger    logging.Logger
-	targetID  string
-	stop      chan bool
-	baseImage string
-	statsPort string
+	logger     logging.Logger
+	targetID   string
+	targetName string
+	stop       chan bool
+	baseImage  string
+	statsPort  string
 }
 
 var availableHostPorts map[int]bool
@@ -56,15 +58,15 @@ func unregisterPort(port string) error {
 	return nil
 }
 
-func NewGoFuzzer(target string, stats chan *TargetStats) *suture.Supervisor {
-	log := logging.NewTargetLogger(target)
-	ret := New(log, target)
+func NewGoFuzzer(target *types.Target, stats chan *TargetStats) *suture.Supervisor {
+	log := logging.NewTargetLogger(target.Name)
+	ret := New(log, target.Name)
 	statsPort := getAvailablePort()
-	ret.Add(NewBackupService(target, log))
-	ret.Add(NewGofuzzStatsService(target, statsPort, log, stats))
-	ret.Add(NewGofuzzCrashService(target, log))
+	ret.Add(NewBackupService(target.UniqueID, log))
+	ret.Add(NewGofuzzStatsService(target.UniqueID, statsPort, log, stats))
+	ret.Add(NewGofuzzCrashService(target.UniqueID, target.Revision, log))
 	ret.Add(GoFuzzerService{
-		log, target, make(chan bool), "fuzzbox_go", statsPort,
+		log, target.UniqueID, target.Name, make(chan bool), "fuzzbox_go", statsPort,
 	})
 	return ret
 }
@@ -104,11 +106,11 @@ func (s GoFuzzerService) Serve() {
 	suppress := opts["suppressFuzzerOutput"] == "1"
 	stdout := stdoutWriter{
 		suppressOutput: suppress,
-		target:         s.targetID,
+		target:         s.targetName,
 	}
 	stderr := stderrWriter{
 		suppressOutput: suppress,
-		target:         s.targetID,
+		target:         s.targetName,
 	}
 	s.logger.Info(fmt.Sprintf("GoFuzzerService running build steps"))
 	config, err := docker.CreateFuzzer(s.targetID, s.baseImage, s.stop, map[string]string{
