@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/everestmz/maxfuzz/internal/helpers"
+
 	"github.com/everestmz/maxfuzz/internal/docker"
 	"github.com/everestmz/maxfuzz/internal/logging"
 	"github.com/everestmz/maxfuzz/internal/supervisor"
@@ -33,6 +35,54 @@ var targetsTimer map[string]int64
 var targetStats map[string]*supervisor.TargetStats
 var targetsLock sync.RWMutex
 var fuzzerSupervisor *suture.Supervisor
+var fuzzStrategy string // parallel or robin
+
+func addTarget(t *Target) error {
+	targetsLock.Lock()
+	_, exists := targets[t.ID]
+	if exists {
+
+		targetsLock.Unlock()
+		return fmt.Errorf(fmt.Sprintf("Target %s already exists", t.ID))
+	}
+	targets[t.ID] = t
+	targetStats[t.ID] = &supervisor.TargetStats{
+		ID:             t.ID,
+		TestsPerSecond: 0,
+		BugsFound:      0,
+	}
+	if fuzzStrategy == "robin" {
+		// Round Robin fuzzing
+		targetsTimer[t.ID] = 0
+
+	} else {
+		// Parallel fuzzing
+		parallelAddChan <- targets[t.ID]
+	}
+	targetsLock.Unlock()
+	return nil
+}
+
+func removeTarget(t *Target) error {
+	targetsLock.Lock()
+	_, exists := targets[t.ID]
+	if !exists {
+		targetsLock.Unlock()
+		return fmt.Errorf(fmt.Sprintf("Target %s does not exist", t.ID))
+	}
+	delete(targets, t.ID)
+	delete(targetStats, t.ID)
+	// Round robin fuzzing
+	if fuzzStrategy == "robin" {
+		delete(targetsTimer, t.ID)
+	} else {
+		// Parallel fuzzing
+		stopChan <- t.ID
+	}
+	interruptTarget(t.ID)
+	targetsLock.Unlock()
+	return nil
+}
 
 func deserializeTarget(c *gin.Context) (*Target, error) {
 	ret := Target{}
@@ -66,23 +116,10 @@ func registerTarget(c *gin.Context) {
 	}
 	log := logging.NewTargetLogger(t.ID)
 	log.Info("Registering target...")
-
-	targetsLock.Lock()
-	_, exists := targets[t.ID]
-	if exists {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Target %s already exists", t.ID)})
-		targetsLock.Unlock()
-		return
+	err = addTarget(t)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
-	targets[t.ID] = t
-	targetsTimer[t.ID] = 0
-	targetStats[t.ID] = &supervisor.TargetStats{
-		ID:             t.ID,
-		TestsPerSecond: 0,
-		BugsFound:      0,
-	}
-	targetsLock.Unlock()
-
 	log.Info("Target registered")
 	c.JSON(http.StatusOK, t)
 }
@@ -95,18 +132,10 @@ func unregisterTarget(c *gin.Context) {
 	}
 	log := logging.NewTargetLogger(t.ID)
 	log.Info("Unregistering target...")
-	targetsLock.Lock()
-	_, exists := targets[t.ID]
-	if !exists {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Target %s does not exist", t.ID)})
-		targetsLock.Unlock()
-		return
+	err = removeTarget(t)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	}
-	delete(targets, t.ID)
-	delete(targetsTimer, t.ID)
-	delete(targetStats, t.ID)
-	targetsLock.Unlock()
-	interruptTarget(t.ID)
 	log.Info("Target unregistered")
 	if len(targets) == 0 {
 		log.Info("0 targets registered. Maxfuzz on standby...")
@@ -138,6 +167,11 @@ func main() {
 	targets = map[string]*Target{}
 	targetsTimer = map[string]int64{}
 	targetStats = map[string]*supervisor.TargetStats{}
+	maxfuzzOptions := helpers.MaxfuzzOptions()
+	fuzzStrategy = maxfuzzOptions["strategy"]
+	if fuzzStrategy != "robin" && fuzzStrategy != "parallel" {
+		panic("Unsupported fuzz strategy!")
+	}
 	err := docker.Init()
 	if err != nil {
 		panic(err)

@@ -20,8 +20,8 @@ func New(l logging.Logger, name string) *suture.Supervisor {
 	spec := suture.Spec{
 		Log:              l.Info,
 		FailureDecay:     30,               // 30 second decay
-		FailureThreshold: 5,                // 5 failures
-		FailureBackoff:   15 * time.Second, // Wait for 15 seconds after threshold hit
+		FailureThreshold: 1,                // 1 failure
+		FailureBackoff:   30 * time.Second, // Wait for 15 seconds after threshold hit
 		Timeout:          30 * time.Second, // 30 seconds for service to terminate
 	}
 
@@ -37,6 +37,7 @@ type TargetStats struct {
 
 // Log Writers
 // TODO: some way of splitting logs so these ones are saved elsewhere (container vs maxfuzz logs)
+// TODO: specify which fuzzer stderr/out comes from in logs so we know what we're looking at
 type stderrWriter struct {
 	containerID    string
 	suppressOutput bool

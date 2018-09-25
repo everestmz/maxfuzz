@@ -5,12 +5,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/thejerf/suture"
-
 	"github.com/everestmz/maxfuzz/internal/logging"
 	"github.com/everestmz/maxfuzz/internal/supervisor"
 
 	"github.com/sirupsen/logrus"
+	"github.com/thejerf/suture"
 )
 
 var log = &logrus.Logger{
@@ -19,15 +18,26 @@ var log = &logrus.Logger{
 	Hooks:     make(logrus.LevelHooks),
 	Level:     logrus.DebugLevel,
 }
-var currentTarget string
-var fuzzInterval = 7200 //seconds
-var stopChan chan bool
+
+////////////////////
+//
+// COMMON VARS
+//
 var statsChan chan *supervisor.TargetStats
 var fuzzServices = map[string]func(string, chan *supervisor.TargetStats) *suture.Supervisor{
 	"c":   supervisor.NewCFuzzer,
 	"c++": supervisor.NewCFuzzer,
 	"go":  supervisor.NewGoFuzzer,
 }
+
+//
+///////////////////
+//
+// ROUND ROBIN FUZZING
+//
+var currentTarget string
+var fuzzInterval = 7200 //seconds
+var stopChan chan string
 
 func nextTarget() string {
 	if len(targets) == 0 {
@@ -58,10 +68,25 @@ func nextTarget() string {
 	return selectedTarget
 }
 
+//
+///////////////////
+//
+// PARALLEL FUZZING
+//
+var parallelFuzzers map[string]*suture.Supervisor
+var parallelAddChan chan *Target
+
+//
+///////////////////
 func interruptTarget(t string) {
-	if t == currentTarget {
-		stopChan <- true
+	if fuzzStrategy == "robin" {
+		if t == currentTarget {
+			stopChan <- t
+		}
+		return
 	}
+	// Else parallel fuzzing
+	stopChan <- t
 }
 
 func logMessage(msg string) *logrus.Entry {
@@ -84,13 +109,55 @@ func watchStats() {
 }
 
 func fuzz() {
+	stopChan = make(chan string)
+	statsChan = make(chan *supervisor.TargetStats)
+	go watchStats()
+	if fuzzStrategy == "robin" {
+		fuzzRoundRobin()
+	}
+	fuzzParallel()
+}
+
+func fuzzParallel() {
+	logMessage("Waiting for targets...").Info()
+	parallelAddChan = make(chan *Target)
+	parallelFuzzers = map[string]*suture.Supervisor{}
+
+	for {
+		select {
+		case t := <-parallelAddChan:
+			log.Println(fmt.Sprintf("%+v", *t))
+			newFuzzService, ok := fuzzServices[t.Language]
+			if !ok {
+				logMessage(fmt.Sprintf("Invalid language %s for target %s", t.Language, t.ID)).Info()
+				continue
+			}
+			fuzzer := newFuzzService(t.ID, statsChan)
+			fuzzerSupervisor := supervisor.New(logging.NewFuzzerLogger(t.ID), t.ID)
+			fuzzerSupervisor.Add(fuzzer)
+			logMessage(fmt.Sprintf("Fuzzing new target %s", t.ID)).Info()
+			fuzzerSupervisor.ServeBackground()
+			parallelFuzzers[t.ID] = fuzzerSupervisor
+		case t := <-stopChan:
+			logMessage(fmt.Sprintf("Killing target %s", t)).Info()
+			sup, ok := parallelFuzzers[t]
+			if !ok {
+				logMessage(fmt.Sprintf("Can't stop target %s", t)).Info()
+				continue
+			}
+			sup.Stop()
+			delete(parallelFuzzers, t)
+			if len(parallelFuzzers) == 0 {
+				logMessage("Waiting for targets...").Info()
+			}
+		}
+	}
+}
+
+func fuzzRoundRobin() {
 	var timer *time.Timer
 	var skipFuzzerStartup = false
-	statsChan = make(chan *supervisor.TargetStats)
-	stopChan = make(chan bool)
 	logMessage("Waiting for targets...").Info()
-
-	go watchStats()
 
 	for {
 		targetsLock.RLock()
